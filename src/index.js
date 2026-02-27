@@ -1,47 +1,67 @@
-import pkg from './package.json';
+import React from 'react';
+import createButtonObserver from 'roamjs-components/dom/createButtonObserver';
+import { createComponentRender } from 'roamjs-components/components/ComponentContainer';
+import addStyle from 'roamjs-components/dom/addStyle';
+import updateBlock from 'roamjs-components/writes/updateBlock';
+import Table from './table.jsx';
 
-const panelConfig = {
-  tabTitle: pkg.name,
-  settings: [
-      {id:          "button-setting",
-       name:        "Button test",
-       description: "tests the button",
-       action:      {type:    "button",
-                     onClick: (evt) => { console.log("Button clicked!"); },
-                     content: "Button"}},
-      {id:          "switch-setting",
-       name:        "Switch Test",
-       description: "Test switch component",
-       action:      {type:     "switch",
-                     onChange: (evt) => { console.log("Switch!", evt); }}},
-      {id:     "input-setting",
-       name:   "Input test",
-       action: {type:        "input",
-                placeholder: "placeholder",
-                onChange:    (evt) => { console.log("Input Changed!", evt); }}},
-      {id:     "select-setting",
-       name:   "Select test",
-       action: {type:     "select",
-                items:    ["one", "two", "three"],
-                onChange: (evt) => { console.log("Select Changed!", evt); }}}
-  ]
-};
-
-async function onload({extensionAPI}) {
-  // set defaults if they don't exist
-  if (!extensionAPI.settings.get('data')) {
-      await extensionAPI.settings.set('data', "01");
-  }
-  extensionAPI.settings.panel.create(panelConfig);
-
-  console.log(`${pkg.name} version ${pkg.version} loaded`);
-}
-
-function onunload() {
-  console.log(`${pkg.name} version ${pkg.version} unloaded`);
-}
+let observer;
 
 export default {
-  onload,
-  onunload
+  onload({ extensionAPI }) {
+    extensionAPI.ui.commandPalette.addCommand({
+      label: 'Create Table+',
+      callback: async () => {
+        const uid = window.roamAlphaAPI.ui.getFocusedBlock()?.['block-uid'];
+        if (!uid) return;
+        document.querySelector('body')?.click();
+        setTimeout(async () => {
+          await updateBlock({ uid, text: '{{table-plus}}' });
+        }, 200);
+      },
+    });
+
+    observer = createButtonObserver({
+      attribute: 'table-plus',
+      render: (b) => {
+        createComponentRender(
+          ({ blockUid }) => <Table blockUid={blockUid} />,
+          'rdt-table-container'
+        )(b);
+      },
+    });
+
+    addStyle(`
+      .rdt-table-config .rdt-input-label label {
+        min-width: 70px;
+      }
+      /* Chrome, Safari, Edge, Opera */
+      .rdt-table-config input::-webkit-outer-spin-button,
+      .rdt-table-config input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      /* Firefox */
+      .rdt-table-config input[type=number] {
+        -moz-appearance: textfield;
+      }
+      .rdt-workbench-table.basic-text td {
+        user-select: none;
+        pointer-events: none;
+      }
+      .rdt-workbench-table.basic-text input,
+      .rdt-workbench-table.basic-text span {
+        pointer-events: auto;
+        width: 100%;
+      }
+      .rdt-workbench-table .rm-block-separator,
+      .rdt-table-container .roamjs-edit-component {
+        display: none;
+      }
+    `);
+  },
+
+  onunload() {
+    observer?.disconnect();
+  },
 };

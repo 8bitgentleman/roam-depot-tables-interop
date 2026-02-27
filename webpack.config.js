@@ -1,7 +1,8 @@
 module.exports = {
     externals: {
         react: "React",
-        "chrono-node": "ChronoNode"
+        "react-dom": "ReactDOM",
+        "@blueprintjs/core": ["Blueprint", "Core"],
     },
     externalsType: "window",
     entry: './src/index.js',
@@ -16,4 +17,22 @@ module.exports = {
         outputModule: true,
     },
     mode: "production",
+    module: {
+        rules: [{
+            test: /\.jsx?$/,
+            exclude: /node_modules/,
+            use: {
+                loader: 'babel-loader',
+                options: {
+                    presets: [
+                        '@babel/preset-env',
+                        ['@babel/preset-react', { runtime: 'classic' }]
+                    ]
+                }
+            }
+        }]
+    },
+    resolve: {
+        extensions: ['.js', '.jsx'],
+    },
 };

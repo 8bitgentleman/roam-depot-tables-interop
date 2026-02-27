@@ -9,3 +9,5 @@ out
 
 .DS_Store
 *extension.js
+*.LICENSE.txt
+/inspo
