@@ -25,7 +25,7 @@ function mount(el) {
   if (hoverOnly) hoverOnly.style.display = 'none';
 
   const container = document.createElement('div');
-  container.className = 'rdt-table-container';
+  container.className = 'rdt-table-container dont-focus-block';
   el.appendChild(container);
 
   const root = ReactDOM.createRoot(container);

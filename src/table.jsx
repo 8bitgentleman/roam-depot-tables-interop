@@ -371,7 +371,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
         <TableMenu />
       </span>
       <HTMLTable
-        className={`rdt-workbench-table${view === 'plain' ? ' basic-text' : ''}`}
+        className={`rdt-workbench-table dont-focus-block${view === 'plain' ? ' basic-text' : ''}`}
         style={{ width: '100%', tableLayout: 'fixed', pointerEvents: 'auto' }}
         bordered={styles.bordered}
         condensed={styles.condensed}
