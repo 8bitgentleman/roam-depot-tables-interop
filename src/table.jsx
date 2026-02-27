@@ -25,58 +25,67 @@ import {
 import createBlock from 'roamjs-components/writes/createBlock';
 import updateBlock from 'roamjs-components/writes/updateBlock';
 import getBasicTreeByParentUid from 'roamjs-components/queries/getBasicTreeByParentUid';
-import getSubTree from 'roamjs-components/util/getSubTree';
 import getUids from 'roamjs-components/dom/getUids';
-import setInputSetting from 'roamjs-components/util/setInputSetting';
-import setInputSettings from 'roamjs-components/util/setInputSettings';
 
-const SETTINGS_KEY = '__table-settings__';
+// ─── Settings (stored in :block/props, invisible to native table rendering) ───
+//
+// Pattern from better-bullets: write with "key", read checking ":key" and "::key"
+// because Roam normalizes prop keys differently depending on context.
+const PROP_WRITE_KEY = 'table-plus/settings';
+const PROP_READ_KEYS = ['::table-plus/settings', ':table-plus/settings', 'table-plus/settings'];
 
-// Reads the native-compatible block structure under blockUid.
-// Header row: first child block (its text = col 0 header; its children = remaining headers).
-// Data rows: subsequent child blocks (text = col 0 cell; children = remaining cells).
-// Settings: last child with text === SETTINGS_KEY.
+function defaultSettings() {
+  return {
+    styles: { striped: true, bordered: false, condensed: false, interactive: false },
+    widths: {},
+    view: 'plain',
+  };
+}
+
+function getBlockSettings(blockUid) {
+  try {
+    const pulled = window.roamAlphaAPI.pull('[:block/props]', [':block/uid', blockUid]);
+    const props = pulled?.[':block/props'];
+    if (props) {
+      for (const k of PROP_READ_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(props, k)) {
+          const raw = props[k];
+          if (typeof raw === 'string') return JSON.parse(raw);
+        }
+      }
+    }
+  } catch {}
+  return defaultSettings();
+}
+
+function saveBlockSettings(blockUid, settings) {
+  try {
+    window.roamAlphaAPI.updateBlock({
+      block: { uid: blockUid, props: { [PROP_WRITE_KEY]: JSON.stringify(settings) } },
+    });
+  } catch {}
+}
+
+// ─── Table state ──────────────────────────────────────────────────────────────
+//
+// Native block structure (same as {{[[table]]}}):
+//   {{[[table]]}}         ← blockUid
+//     - Header Col 1      ← tree[0], text = col 0 header, children = remaining headers
+//         - Header Col 2
+//     - Row 1 Col 1       ← tree[1..n], text = col 0 cell, children = remaining cells
+//         - Row 1 Col 2
 function getTableState(blockUid) {
   const tree = getBasicTreeByParentUid(blockUid);
-  const settingsNode = getSubTree({ tree, key: SETTINGS_KEY, parentUid: blockUid });
-  const dataNodes = tree.filter(c => c.text !== SETTINGS_KEY);
-  const headerNode = dataNodes[0] ?? null;
-  const rows = dataNodes.slice(1);
-
-  const stylesNode = settingsNode.uid
-    ? getSubTree({ tree: settingsNode.children, key: 'styles', parentUid: settingsNode.uid })
-    : { uid: '', children: [] };
-  const widthsNode = settingsNode.uid
-    ? getSubTree({ tree: settingsNode.children, key: 'widths', parentUid: settingsNode.uid })
-    : { uid: '', children: [] };
-  const viewNode = settingsNode.uid
-    ? getSubTree({ tree: settingsNode.children, key: 'view', parentUid: settingsNode.uid })
-    : { uid: '', children: [] };
-
-  const styles = {
-    striped:     stylesNode.children.some(c => c.text === 'striped'),
-    bordered:    stylesNode.children.some(c => c.text === 'bordered'),
-    condensed:   stylesNode.children.some(c => c.text === 'condensed'),
-    interactive: stylesNode.children.some(c => c.text === 'interactive'),
-  };
-  // widths stored as child blocks with text like "0 - 30%"
-  const widths = Object.fromEntries(
-    widthsNode.children
-      .map(c => /^(\d+) - (.+)$/.exec(c.text))
-      .filter(Boolean)
-      .map(m => [parseInt(m[1]), m[2]])
-  );
-  const view = viewNode.children[0]?.text ?? 'plain';
-
-  return { tree, settingsNode, headerNode, rows, styles, widths, view };
+  const headerNode = tree[0] ?? null;
+  const rows = tree.slice(1);
+  const settings = getBlockSettings(blockUid);
+  return { tree, headerNode, rows, ...settings };
 }
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-// Shows row/col inputs on first run; style/view controls always.
 const Configuration = ({ blockUid, onSubmit }) => {
   const initialState = useMemo(() => getTableState(blockUid), [blockUid]);
-  const { settingsNode, headerNode } = initialState;
-  const isLoaded = !!headerNode?.uid;
+  const isLoaded = !!initialState.headerNode?.uid;
 
   const [isCreatingBlocks, setIsCreatingBlocks] = useState(false);
   const [numRows, setNumRows] = useState(3);
@@ -89,10 +98,8 @@ const Configuration = ({ blockUid, onSubmit }) => {
   );
 
   const handleSubmit = async () => {
-    let activeSettingsUid = settingsNode.uid;
-
     if (!isLoaded) {
-      // First child = header row block. text = col 0 header; children = remaining headers.
+      // First child = header row. text = col 0, children = remaining cols.
       await createBlock({
         node: {
           text: 'Header 1',
@@ -104,7 +111,7 @@ const Configuration = ({ blockUid, onSubmit }) => {
         parentUid: blockUid,
       });
 
-      // Data rows: text = col 0 cell; children = remaining cells.
+      // Data rows: text = col 0, children = remaining cols.
       for (let i = 0; i < numRows; i++) {
         await createBlock({
           node: {
@@ -116,31 +123,16 @@ const Configuration = ({ blockUid, onSubmit }) => {
         });
       }
 
-      // Settings block goes last.
-      activeSettingsUid = await createBlock({
-        node: { text: SETTINGS_KEY },
-        order: 'last',
-        parentUid: blockUid,
-      });
-
-      // Collapse {{table-plus}} block so children don't clutter the page.
       await window.roamAlphaAPI.data.block.update({
         block: { uid: blockUid, open: false },
       });
-    }
 
-    setInputSettings({
-      blockUid: activeSettingsUid,
-      key: 'styles',
-      values: Object.entries(styleOptions)
-        .filter(([, value]) => value)
-        .map(([key]) => key),
-    });
-    await setInputSetting({
-      blockUid: activeSettingsUid,
-      key: 'view',
-      value: view,
-    });
+      saveBlockSettings(blockUid, { styles: styleOptions, widths: {}, view });
+    } else {
+      // Settings update only — preserve existing column widths.
+      const existing = getBlockSettings(blockUid);
+      saveBlockSettings(blockUid, { ...existing, styles: styleOptions, view });
+    }
   };
 
   return (
@@ -216,19 +208,15 @@ const Configuration = ({ blockUid, onSubmit }) => {
 };
 
 // ─── CellEmbed ────────────────────────────────────────────────────────────────
-// Renders a Roam block embed inside a table cell.
 const CellEmbed = ({ uid }) => {
   const contentRef = useRef(null);
   useEffect(() => {
     const el = contentRef.current;
-    if (el) {
-      window.roamAlphaAPI.ui.components.renderBlock({ uid, el });
-    }
+    if (el) window.roamAlphaAPI.ui.components.renderBlock({ uid, el });
   }, [uid]);
   return <div className="rdt-table-embed" ref={contentRef} />;
 };
 
-// Transparent 1×1 gif so the drag ghost image is invisible.
 const dragImage = document.createElement('img');
 dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
@@ -237,15 +225,12 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
   const [state, setState] = useState(() => getTableState(blockUid));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const containerRef = useRef(null);
-  const { headerNode, rows, styles, widths, view, settingsNode } = state;
+  const { headerNode, rows, styles, widths, view } = state;
 
-  // First column is the block text itself; remaining columns are children.
+  // Col 0 = block text (no separate child); col 1+ = child blocks.
   const headerCells = useMemo(() => {
     if (!headerNode) return [];
-    return [
-      { uid: headerNode.uid, text: headerNode.text },
-      ...headerNode.children,
-    ];
+    return [{ uid: headerNode.uid, text: headerNode.text }, ...headerNode.children];
   }, [headerNode]);
 
   const numCols = headerCells.length;
@@ -280,15 +265,14 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
 
     if (e.type !== 'dragend') return;
 
-    setInputSettings({
-      blockUid: settingsNode.uid,
-      key: 'widths',
-      values: thRefs
-        .map((ref, index) => [index, ref.current?.style.width])
-        .filter(([, width]) => width)
-        .map(([index, width]) => `${index} - ${width}`),
-    });
-  }, [settingsNode.uid, thRefs]);
+    const newWidths = Object.fromEntries(
+      thRefs
+        .map((ref, i) => [i, ref.current?.style.width])
+        .filter(([, w]) => w)
+    );
+    const existing = getBlockSettings(blockUid);
+    saveBlockSettings(blockUid, { ...existing, widths: newWidths });
+  }, [blockUid, thRefs]);
 
   const TableMenu = () => (
     <Popover
@@ -305,7 +289,6 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
               text="Row"
               onClick={async () => {
                 const fresh = getTableState(blockUid);
-                // Insert after all data rows, before settings.
                 await createBlock({
                   node: {
                     text: '',
@@ -328,11 +311,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
                   parentUid: headerNode.uid,
                 });
                 for (const row of rows) {
-                  await createBlock({
-                    node: { text: '' },
-                    order: 'last',
-                    parentUid: row.uid,
-                  });
+                  await createBlock({ node: { text: '' }, order: 'last', parentUid: row.uid });
                 }
                 setState(getTableState(blockUid));
               }}
@@ -355,7 +334,6 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
               text="Last Column"
               onClick={async () => {
                 if (numCols <= 1) return;
-                // Remove last child from header (col 0 is the block itself, never deleted)
                 const lastHeader = headerNode.children[headerNode.children.length - 1];
                 if (lastHeader) {
                   await window.roamAlphaAPI.deleteBlock({ block: { uid: lastHeader.uid } });
@@ -376,14 +354,9 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
             icon="edit"
             text="Edit Block"
             onClick={() => {
-              const location = getUids(
-                containerRef.current?.closest('.roam-block')
-              );
+              const location = getUids(containerRef.current?.closest('.roam-block'));
               window.roamAlphaAPI.ui.setBlockFocusAndSelection({
-                location: {
-                  'window-id': location.windowId,
-                  'block-uid': location.blockUid,
-                },
+                location: { 'window-id': location.windowId, 'block-uid': location.blockUid },
               });
             }}
           />
@@ -428,11 +401,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
         </thead>
         <tbody>
           {rows.map((row) => {
-            // Col 0 = the row block itself; remaining = its children.
-            const cells = [
-              { uid: row.uid, text: row.text },
-              ...row.children,
-            ];
+            const cells = [{ uid: row.uid, text: row.text }, ...row.children];
             return (
               <tr key={row.uid}>
                 {cells.map((cell, i) => (
@@ -480,12 +449,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
 // ─── Table (wrapper) ──────────────────────────────────────────────────────────
 const Table = ({ blockUid }) => {
   const tree = useMemo(() => getBasicTreeByParentUid(blockUid), [blockUid]);
-  const dataNodes = useMemo(
-    () => tree.filter(c => c.text !== SETTINGS_KEY),
-    [tree]
-  );
-  const hasData = !!dataNodes[0]?.uid;
-  const [isEdit, setIsEdit] = useState(!hasData);
+  const [isEdit, setIsEdit] = useState(!tree[0]?.uid);
 
   return isEdit ? (
     <Configuration blockUid={blockUid} onSubmit={() => setIsEdit(false)} />

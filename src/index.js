@@ -1,34 +1,69 @@
 import React from 'react';
-import createButtonObserver from 'roamjs-components/dom/createButtonObserver';
-import { createComponentRender } from 'roamjs-components/components/ComponentContainer';
+import ReactDOM from 'react-dom';
+import createHTMLObserver from 'roamjs-components/dom/createHTMLObserver';
+import getUids from 'roamjs-components/dom/getUids';
 import addStyle from 'roamjs-components/dom/addStyle';
 import updateBlock from 'roamjs-components/writes/updateBlock';
 import Table from './table.jsx';
+
+// Track all mounts for cleanup on unload.
+// Key: .rm-table element, Value: { root, container, nativeTable, hoverOnly }
+const mounts = new Map();
+
+function mount(el) {
+  if (mounts.has(el)) return;
+
+  const blockEl = el.closest('.roam-block');
+  if (!blockEl) return;
+  const { blockUid } = getUids(blockEl);
+  if (!blockUid) return;
+
+  // Hide Roam's native table and its edit/download button bar.
+  const nativeTable = el.querySelector('.roam-table');
+  if (nativeTable) nativeTable.style.display = 'none';
+  const hoverOnly = el.querySelector('.hoveronly');
+  if (hoverOnly) hoverOnly.style.display = 'none';
+
+  const container = document.createElement('div');
+  container.className = 'rdt-table-container';
+  el.appendChild(container);
+
+  const root = ReactDOM.createRoot(container);
+  root.render(<Table blockUid={blockUid} />);
+  mounts.set(el, { root, container, nativeTable, hoverOnly });
+}
+
+function unmount(el) {
+  const m = mounts.get(el);
+  if (!m) return;
+  m.root.unmount();
+  m.container.remove();
+  if (m.nativeTable) m.nativeTable.style.display = '';
+  if (m.hoverOnly) m.hoverOnly.style.display = '';
+  mounts.delete(el);
+}
 
 let observer;
 
 export default {
   onload({ extensionAPI }) {
     extensionAPI.ui.commandPalette.addCommand({
-      label: 'Create Table+',
+      label: 'Create Table',
       callback: async () => {
         const uid = window.roamAlphaAPI.ui.getFocusedBlock()?.['block-uid'];
         if (!uid) return;
         document.querySelector('body')?.click();
         setTimeout(async () => {
-          await updateBlock({ uid, text: '{{table-plus}}' });
+          await updateBlock({ uid, text: '{{[[table]]}}' });
         }, 200);
       },
     });
 
-    observer = createButtonObserver({
-      attribute: 'table-plus',
-      render: (b) => {
-        createComponentRender(
-          ({ blockUid }) => <Table blockUid={blockUid} />,
-          'rdt-table-container'
-        )(b);
-      },
+    observer = createHTMLObserver({
+      tag: 'DIV',
+      className: 'rm-table',
+      callback: mount,
+      removeCallback: unmount,
     });
 
     addStyle(`
@@ -54,8 +89,7 @@ export default {
         pointer-events: auto;
         width: 100%;
       }
-      .rdt-workbench-table .rm-block-separator,
-      .rdt-table-container .roamjs-edit-component {
+      .rdt-workbench-table .rm-block-separator {
         display: none;
       }
     `);
@@ -63,5 +97,8 @@ export default {
 
   onunload() {
     observer?.disconnect();
+    for (const el of mounts.keys()) {
+      unmount(el);
+    }
   },
 };

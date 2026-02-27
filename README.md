@@ -1,19 +1,19 @@
 # Table+
 
-A table extension for Roam Research that stores your data in the same block structure as native `{{[[table]]}}` blocks. Your data is never locked into a proprietary format -- if you uninstall the extension, the underlying blocks remain and can be read by Roam's built-in table renderer.
+An enhanced table editor for Roam Research that replaces the native table renderer with a richer interface. Because it works directly with native `{{table}}` and `{{[[table]]}}` blocks, your data is always in standard Roam format -- disable the extension and your tables are still fully readable with Roam's built-in renderer.
+
+Display preferences (styles, column widths, view mode) are stored in the block's properties, not as child blocks, so they never appear as extra rows in the native rendering.
 
 ## How it works
 
-Table+ uses a `{{table-plus}}` button block. The child blocks beneath it follow the exact same structure Roam uses for native tables: each row is a block whose text is the first cell, and whose children are the remaining cells. A `__table-settings__` block at the end stores display preferences (styles, column widths, view mode).
-
-This means you can copy the data rows under a `{{[[table]]}}` block at any time and get a fully functional native Roam table -- no conversion needed.
+Table+ intercepts every native table block in your graph and replaces the default table view with its own component. The underlying block structure is identical to what Roam uses natively: each row is a block whose text is the first cell, and whose children are the remaining cells. The extension adds nothing to that structure -- settings live in `:block/props` on the table block itself.
 
 ## Usage
 
 **Creating a table**
 
 1. Place your cursor in any block.
-2. Open the command palette (Cmd+P on Mac, Ctrl+P on Windows) and run "Create Table+", or type `{{table-plus}}` directly into a block.
+2. Open the command palette (Cmd+P on Mac, Ctrl+P on Windows) and run "Create Table", or type `{{[[table]]}}` directly into a block.
 3. A configuration panel will appear. Choose your number of rows and columns, select any display options, and click "Create Table".
 
 **Editing cells**
@@ -45,10 +45,4 @@ Select "Edit Block" from the table menu to focus the underlying `{{table-plus}}`
 
 ## Native table interop
 
-To convert a Table+ table to a native Roam table:
-
-1. Create a new block with `{{[[table]]}}`
-2. Move the data row blocks (everything except `__table-settings__`) as children of that block
-3. Delete the `__table-settings__` block
-
-The data rows are already in the correct format and will render immediately as a native table.
+Table+ works directly on native `{{table}}` and `{{[[table]]}}` blocks. If you disable the extension, Roam renders your tables exactly as it normally would -- there is nothing to convert or clean up.
