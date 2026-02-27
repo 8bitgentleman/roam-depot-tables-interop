@@ -27,8 +27,23 @@ import updateBlock from 'roamjs-components/writes/updateBlock';
 import getBasicTreeByParentUid from 'roamjs-components/queries/getBasicTreeByParentUid';
 import getUids from 'roamjs-components/dom/getUids';
 
+// ─── Settings config ──────────────────────────────────────────────────────────
+// Single source of truth for style options and view modes.
+// Used by defaultSettings(), Configuration, and DisplayTable.
+
+const STYLE_CONFIG = [
+  { key: 'striped',     label: 'Striped',      description: 'Alternate row background colors' },
+  { key: 'bordered',    label: 'Bordered',     description: 'Draw borders around each cell' },
+  { key: 'condensed',   label: 'Compact',      description: 'Reduce cell padding' },
+  { key: 'interactive', label: 'Interactive',  description: 'Highlight rows on hover' },
+];
+
+const VIEW_CONFIG = [
+  { value: 'plain', label: 'Basic Text', description: 'Edit cells as inline plain text' },
+  { value: 'embed', label: 'Embed',      description: 'Render full Roam blocks — supports markdown, block refs, queries' },
+];
+
 // ─── Settings (stored in :block/props, invisible to native table rendering) ───
-//
 // Pattern from better-bullets: write with "key", read checking ":key" and "::key"
 // because Roam normalizes prop keys differently depending on context.
 const PROP_WRITE_KEY = 'table-plus/settings';
@@ -36,7 +51,9 @@ const PROP_READ_KEYS = ['::table-plus/settings', ':table-plus/settings', 'table-
 
 function defaultSettings() {
   return {
-    styles: { striped: true, bordered: false, condensed: false, interactive: false },
+    styles: Object.fromEntries(
+      STYLE_CONFIG.map(({ key }) => [key, key === 'striped'])
+    ),
     widths: {},
     view: 'plain',
   };
@@ -67,7 +84,6 @@ function saveBlockSettings(blockUid, settings) {
 }
 
 // ─── Table state ──────────────────────────────────────────────────────────────
-//
 // Native block structure (same as {{[[table]]}}):
 //   {{[[table]]}}         ← blockUid
 //     - Header Col 1      ← tree[0], text = col 0 header, children = remaining headers
@@ -82,6 +98,17 @@ function getTableState(blockUid) {
   return { tree, headerNode, rows, ...settings };
 }
 
+// ─── OptionLabel ──────────────────────────────────────────────────────────────
+// Reusable label + description used for both checkboxes and radio buttons.
+const OptionLabel = ({ label, description }) => (
+  <span>
+    {label}
+    <span style={{ display: 'block', fontSize: '11px', color: 'var(--rm-text-color-muted, #888)', fontWeight: 'normal', marginTop: 1 }}>
+      {description}
+    </span>
+  </span>
+);
+
 // ─── Configuration ────────────────────────────────────────────────────────────
 const Configuration = ({ blockUid, onSubmit }) => {
   const initialState = useMemo(() => getTableState(blockUid), [blockUid]);
@@ -92,26 +119,19 @@ const Configuration = ({ blockUid, onSubmit }) => {
   const [numCols, setNumCols] = useState(3);
   const [view, setView] = useState(initialState.view);
   const [styleOptions, setStyleOptions] = useState(
-    isLoaded
-      ? initialState.styles
-      : { striped: true, bordered: false, condensed: false, interactive: false }
+    isLoaded ? initialState.styles : defaultSettings().styles
   );
 
   const handleSubmit = async () => {
     if (!isLoaded) {
-      // First child = header row. text = col 0, children = remaining cols.
       await createBlock({
         node: {
           text: 'Header 1',
-          children: Array.from({ length: numCols - 1 }, (_, i) => ({
-            text: `Header ${i + 2}`,
-          })),
+          children: Array.from({ length: numCols - 1 }, (_, i) => ({ text: `Header ${i + 2}` })),
         },
         order: 0,
         parentUid: blockUid,
       });
-
-      // Data rows: text = col 0, children = remaining cols.
       for (let i = 0; i < numRows; i++) {
         await createBlock({
           node: {
@@ -122,72 +142,52 @@ const Configuration = ({ blockUid, onSubmit }) => {
           parentUid: blockUid,
         });
       }
-
       await window.roamAlphaAPI.data.block.update({
         block: { uid: blockUid, open: false },
       });
-
       saveBlockSettings(blockUid, { styles: styleOptions, widths: {}, view });
     } else {
-      // Settings update only — preserve existing column widths.
+      // Settings update — preserve existing column widths.
       const existing = getBlockSettings(blockUid);
       saveBlockSettings(blockUid, { ...existing, styles: styleOptions, view });
     }
   };
 
   return (
-    <div className="rdt-table-config" style={{ width: '215px' }}>
+    <div className="rdt-table-config" style={{ width: '230px' }}>
       <Card elevation={Elevation.ONE}>
         {!isLoaded && (
           <>
-            <FormGroup
-              label="Rows"
-              labelFor="rdt-rows-input"
-              inline={true}
-              className="rdt-input-label"
-            >
-              <NumericInput
-                id="rdt-rows-input"
-                defaultValue={numRows}
-                onValueChange={(value) => setNumRows(value)}
-                style={{ width: '50px' }}
-              />
+            <FormGroup label="Rows" labelFor="rdt-rows-input" inline={true} className="rdt-input-label">
+              <NumericInput id="rdt-rows-input" defaultValue={numRows} onValueChange={setNumRows} style={{ width: '50px' }} />
             </FormGroup>
-            <FormGroup
-              label="Columns"
-              labelFor="rdt-cols-input"
-              inline={true}
-              className="rdt-input-label"
-            >
-              <NumericInput
-                id="rdt-cols-input"
-                defaultValue={numCols}
-                onValueChange={(value) => setNumCols(value)}
-                style={{ width: '50px' }}
-              />
+            <FormGroup label="Columns" labelFor="rdt-cols-input" inline={true} className="rdt-input-label">
+              <NumericInput id="rdt-cols-input" defaultValue={numCols} onValueChange={setNumCols} style={{ width: '50px' }} />
             </FormGroup>
             <Divider />
           </>
         )}
         <div>
-          {Object.entries(styleOptions).map(([key, value]) => (
+          {STYLE_CONFIG.map(({ key, label, description }) => (
             <Checkbox
               key={key}
               alignIndicator="right"
-              checked={value}
-              label={key}
-              onChange={(e) => {
-                const isChecked = e.target.checked;
-                setStyleOptions(prev => ({ ...prev, [key]: isChecked }));
-              }}
-              className="capitalize"
+              checked={!!styleOptions[key]}
+              label={<OptionLabel label={label} description={description} />}
+              onChange={(e) => setStyleOptions(prev => ({ ...prev, [key]: e.target.checked }))}
             />
           ))}
         </div>
         <Divider />
         <RadioGroup onChange={(e) => setView(e.target.value)} selectedValue={view}>
-          <Radio label="Basic Text" value="plain" alignIndicator="right" />
-          <Radio label="Embed" value="embed" alignIndicator="right" />
+          {VIEW_CONFIG.map(({ value, label, description }) => (
+            <Radio
+              key={value}
+              value={value}
+              alignIndicator="right"
+              label={<OptionLabel label={label} description={description} />}
+            />
+          ))}
         </RadioGroup>
         <div style={{ textAlign: 'center', marginTop: '8px' }}>
           <Button
@@ -224,6 +224,9 @@ dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAA
 const DisplayTable = ({ blockUid, setIsEdit }) => {
   const [state, setState] = useState(() => getTableState(blockUid));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // { rowIndex, colIndex } — rowIndex is into the tbody rows array.
+  // After setState triggers a re-render, useEffect focuses the target cell.
+  const [pendingFocus, setPendingFocus] = useState(null);
   const containerRef = useRef(null);
   const { headerNode, rows, styles, widths, view } = state;
 
@@ -240,6 +243,37 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
     setThRefs(headerCells.map(() => React.createRef()));
   }, [headerCells.length]);
   const trRef = useRef(null);
+
+  // Focus a body cell after React has re-rendered (e.g. after adding a row).
+  useEffect(() => {
+    if (!pendingFocus) return;
+    const { rowIndex, colIndex } = pendingFocus;
+    const tbody = containerRef.current?.querySelector('tbody');
+    if (tbody) {
+      const tr = tbody.querySelectorAll('tr')[rowIndex];
+      tr?.querySelectorAll('td')[colIndex]?.querySelector('.bp3-editable-text')?.click();
+    }
+    setPendingFocus(null);
+  }, [pendingFocus]);
+
+  // Enter key: move to same column of next row, adding a row if at the end.
+  // Pass rowIndex = -1 from header cells to land on row 0.
+  const handleEnterKey = useCallback(async (rowIndex, colIndex) => {
+    const nextRowIndex = rowIndex + 1;
+    if (nextRowIndex >= rows.length) {
+      const fresh = getTableState(blockUid);
+      await createBlock({
+        node: {
+          text: '',
+          children: Array.from({ length: numCols - 1 }, () => ({ text: '' })),
+        },
+        order: fresh.rows.length + 1,
+        parentUid: blockUid,
+      });
+      setState(getTableState(blockUid));
+    }
+    setPendingFocus({ rowIndex: nextRowIndex, colIndex });
+  }, [blockUid, rows.length, numCols]);
 
   const onDragStart = useCallback((e) => {
     e.dataTransfer.setDragImage(dragImage, 0, 0);
@@ -381,11 +415,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
         <thead>
           <tr ref={trRef}>
             {headerCells.map((cell, i) => (
-              <th
-                key={cell.uid}
-                ref={thRefs[i]}
-                style={{ width: widths[i], overflow: 'hidden' }}
-              >
+              <th key={cell.uid} ref={thRefs[i]} style={{ width: widths[i], overflow: 'hidden' }}>
                 {view === 'embed' ? (
                   <CellEmbed uid={cell.uid} />
                 ) : (
@@ -393,6 +423,9 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
                     placeholder=""
                     defaultValue={cell.text}
                     onConfirm={(value) => updateBlock({ uid: cell.uid, text: value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) handleEnterKey(-1, i);
+                    }}
                   />
                 )}
               </th>
@@ -400,11 +433,11 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
+          {rows.map((row, rowIndex) => {
             const cells = [{ uid: row.uid, text: row.text }, ...row.children];
             return (
               <tr key={row.uid}>
-                {cells.map((cell, i) => (
+                {cells.map((cell, colIndex) => (
                   <td key={cell.uid} style={{ overflow: 'hidden', position: 'relative' }}>
                     {view === 'embed' ? (
                       <CellEmbed uid={cell.uid} />
@@ -413,10 +446,13 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
                         placeholder=""
                         defaultValue={cell.text}
                         onConfirm={(value) => updateBlock({ uid: cell.uid, text: value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) handleEnterKey(rowIndex, colIndex);
+                        }}
                         style={{ width: '100%' }}
                       />
                     )}
-                    {i < cells.length - 1 && (
+                    {colIndex < cells.length - 1 && (
                       <div
                         style={{
                           width: 11,
@@ -428,7 +464,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
                           paddingLeft: 5,
                           pointerEvents: 'auto',
                         }}
-                        data-column={`column-${i + 1}`}
+                        data-column={`column-${colIndex + 1}`}
                         draggable
                         onDragStart={onDragStart}
                         onDrag={dragHandler}
