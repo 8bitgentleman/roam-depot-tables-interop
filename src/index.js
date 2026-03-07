@@ -230,6 +230,29 @@ export default {
       .rdt-table-wrap .rdt-menu-col .bp3-button { opacity: 0; transition: opacity 0.1s; }
       .rdt-table-wrap:hover .rdt-menu-col .bp3-button { opacity: 1; }
 
+      /* ── Formula cells ── */
+      .rdt-formula-cell {
+        position: relative;
+        background: rgba(19, 123, 189, 0.07) !important;
+        color: rgba(19, 123, 189, 0.8);
+      }
+      .rdt-formula-badge {
+        position: absolute;
+        top: 3px;
+        right: 5px;
+        font-size: 9px;
+        font-family: monospace;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: var(--rm-link-color, #137cbd);
+        opacity: 0.45;
+        user-select: none;
+        pointer-events: none;
+        line-height: 1;
+        transition: opacity 0.1s;
+      }
+      .rdt-cell:hover .rdt-formula-badge { opacity: 0.9; }
+
       /* ── No results ── */
       .rdt-no-results {
         text-align: center;

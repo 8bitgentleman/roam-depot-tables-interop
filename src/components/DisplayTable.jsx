@@ -26,6 +26,7 @@ import {
   colIndexToLetter,
 } from '../utils/blockHelpers';
 import { getBlockSettings, saveBlockSettings } from '../utils/settings';
+import { isFormula, evalFormula } from '../utils/formulas';
 
 // ─── CellEmbed ─────────────────────────────────────────────────────────────────
 const CellEmbed = ({ uid }) => {
@@ -157,6 +158,23 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
   const editInputRef = useRef(null);
   const cancelEditRef = useRef(false);
   const [localOverrides, setLocalOverrides] = useState({});
+
+  const getCellValue = useCallback((rowIdx, colIdx, visited = new Set()) => {
+    const row = filteredRows[rowIdx];
+    if (!row) return '';
+    const cells = getRowCells(row);
+    const cell = cells[colIdx];
+    if (!cell) return '';
+    const text = localOverrides[cell.uid] ?? cell.text ?? '';
+    if (isFormula(text)) {
+      const key = `${rowIdx},${colIdx}`;
+      if (visited.has(key)) return '#CIRC!';
+      const next = new Set(visited);
+      next.add(key);
+      return evalFormula(text, getCellValue, next);
+    }
+    return text;
+  }, [filteredRows, localOverrides]);
 
   function startEdit(rowIndex, colIndex, text) {
     setEditingCell({ rowIndex, colIndex });
@@ -346,13 +364,16 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
       );
     }
 
-    const displayText = localOverrides[cell.uid] ?? cell.text;
+    const rawText = localOverrides[cell.uid] ?? cell.text;
+    const formula = isFormula(rawText);
+    const displayText = formula ? evalFormula(rawText, getCellValue) : rawText;
     const RoamString = getRoamString();
     return (
-      <div className="rdt-cell-display">
+      <div className={`rdt-cell-display${formula ? ' rdt-formula-cell' : ''}`}>
         {displayText
           ? (RoamString ? <RoamString string={displayText} /> : displayText)
           : <span className="rdt-cell-placeholder">&nbsp;</span>}
+        {formula && <span className="rdt-formula-badge" title={rawText}>fx</span>}
       </div>
     );
   }
