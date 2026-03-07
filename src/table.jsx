@@ -7,7 +7,6 @@ import React, {
 } from 'react';
 import {
   HTMLTable,
-  EditableText,
   NumericInput,
   Checkbox,
   Button,
@@ -21,18 +20,20 @@ import {
   Menu,
   MenuDivider,
   Divider,
+  Icon,
 } from '@blueprintjs/core';
 import createBlock from 'roamjs-components/writes/createBlock';
 import updateBlock from 'roamjs-components/writes/updateBlock';
 import getBasicTreeByParentUid from 'roamjs-components/queries/getBasicTreeByParentUid';
 import getUids from 'roamjs-components/dom/getUids';
 
-// ─── Settings config ──────────────────────────────────────────────────────────
+// ─── Settings config ───────────────────────────────────────────────────────────
 const STYLE_CONFIG = [
-  { key: 'striped',     label: 'Striped',     description: 'Alternate row background colors' },
-  { key: 'bordered',    label: 'Bordered',    description: 'Draw borders around each cell' },
-  { key: 'condensed',   label: 'Compact',     description: 'Reduce cell padding' },
-  { key: 'interactive', label: 'Interactive', description: 'Highlight rows on hover' },
+  { key: 'striped',       label: 'Striped',         description: 'Alternate row background colors' },
+  { key: 'bordered',      label: 'Bordered',         description: 'Draw borders around each cell' },
+  { key: 'condensed',     label: 'Compact',          description: 'Reduce cell padding' },
+  { key: 'interactive',   label: 'Interactive',      description: 'Highlight rows on hover' },
+  { key: 'showAddresses', label: 'Cell Addresses',   description: 'Show A1 row/column address labels' },
 ];
 
 const VIEW_CONFIG = [
@@ -40,8 +41,7 @@ const VIEW_CONFIG = [
   { value: 'embed', label: 'Embed',      description: 'Render full Roam blocks — supports markdown, block refs, queries' },
 ];
 
-// ─── Settings (stored in :block/props, invisible to native table rendering) ───
-// Pattern from better-bullets: write with "key", read checking ":key" and "::key".
+// ─── Settings storage ─────────────────────────────────────────────────────────
 const PROP_WRITE_KEY = 'table-plus/settings';
 const PROP_READ_KEYS = ['::table-plus/settings', ':table-plus/settings', 'table-plus/settings'];
 
@@ -77,17 +77,7 @@ function saveBlockSettings(blockUid, settings) {
   } catch {}
 }
 
-// ─── Block structure helpers ──────────────────────────────────────────────────
-// Native Roam table uses a chain structure for columns:
-//   {{[[table]]}}
-//     - Header 1          ← col 0 (block text)
-//         - Header 2      ← col 1 (first child)
-//             - Header 3  ← col 2 (first child of first child)
-//
-// getBasicTreeByParentUid fetches the full recursive tree, so children[0]
-// at each level is the next column in the chain.
-
-// Walk the chain of first-children to collect all cells in a row.
+// ─── Block structure helpers ───────────────────────────────────────────────────
 function getRowCells(node) {
   const cells = [];
   let current = node;
@@ -98,14 +88,12 @@ function getRowCells(node) {
   return cells;
 }
 
-// Walk to the deepest node in the chain (where the next column would attach).
 function getChainTail(node) {
   let current = node;
   while (current.children?.[0]) current = current.children[0];
   return current;
 }
 
-// Walk to the node at a given depth in the chain (depth 0 = node itself).
 function getChainNodeAtDepth(node, depth) {
   let current = node;
   for (let i = 0; i < depth; i++) {
@@ -115,8 +103,6 @@ function getChainNodeAtDepth(node, depth) {
   return current;
 }
 
-// Build a node for createBlock that creates a full chain of numCols cells.
-// getTextFn(colIndex) returns the text for that column (default: empty string).
 function buildRowNode(numCols, getTextFn = () => '') {
   const build = (colIndex) => {
     const node = { text: getTextFn(colIndex) };
@@ -126,7 +112,7 @@ function buildRowNode(numCols, getTextFn = () => '') {
   return build(0);
 }
 
-// ─── Table state ──────────────────────────────────────────────────────────────
+// ─── Table state ───────────────────────────────────────────────────────────────
 function getTableState(blockUid) {
   const tree = getBasicTreeByParentUid(blockUid);
   const headerNode = tree[0] ?? null;
@@ -135,7 +121,17 @@ function getTableState(blockUid) {
   return { tree, headerNode, rows, ...settings };
 }
 
-// ─── OptionLabel ──────────────────────────────────────────────────────────────
+// ─── Address utilities (for future formula support) ───────────────────────────
+export function colIndexToLetter(index) {
+  let result = '', i = index + 1;
+  while (i > 0) {
+    result = String.fromCharCode(65 + ((i - 1) % 26)) + result;
+    i = Math.floor((i - 1) / 26);
+  }
+  return result;
+}
+
+// ─── OptionLabel ───────────────────────────────────────────────────────────────
 const OptionLabel = ({ label, description }) => (
   <span>
     {label}
@@ -145,7 +141,7 @@ const OptionLabel = ({ label, description }) => (
   </span>
 );
 
-// ─── Configuration ────────────────────────────────────────────────────────────
+// ─── Configuration ─────────────────────────────────────────────────────────────
 const Configuration = ({ blockUid, onSubmit }) => {
   const initialState = useMemo(() => getTableState(blockUid), [blockUid]);
   const isLoaded = !!initialState.headerNode?.uid;
@@ -160,13 +156,11 @@ const Configuration = ({ blockUid, onSubmit }) => {
 
   const handleSubmit = async () => {
     if (!isLoaded) {
-      // Header row: chain of numCols cells labeled "Header 1", "Header 2", ...
       await createBlock({
         node: buildRowNode(numCols, (i) => `Header ${i + 1}`),
         order: 0,
         parentUid: blockUid,
       });
-      // Data rows: chain of numCols empty cells.
       for (let i = 0; i < numRows; i++) {
         await createBlock({
           node: buildRowNode(numCols),
@@ -235,7 +229,7 @@ const Configuration = ({ blockUid, onSubmit }) => {
   );
 };
 
-// ─── CellEmbed ────────────────────────────────────────────────────────────────
+// ─── CellEmbed ─────────────────────────────────────────────────────────────────
 const CellEmbed = ({ uid }) => {
   const contentRef = useRef(null);
   useEffect(() => {
@@ -248,31 +242,252 @@ const CellEmbed = ({ uid }) => {
 const dragImage = document.createElement('img');
 dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
-// ─── DisplayTable ─────────────────────────────────────────────────────────────
+// ─── Roam string renderer ─────────────────────────────────────────────────────
+const { String: RoamString } = window.roamAlphaAPI.ui.react;
+
+// ─── Auto-resizing textarea ────────────────────────────────────────────────────
+const AutoTextarea = React.forwardRef(({ value, onChange, onBlur, onKeyDown, className, autoFocus }, ref) => {
+  const inner = useRef(null);
+
+  // Expose the inner textarea via the forwarded ref
+  React.useImperativeHandle(ref, () => inner.current);
+
+  const resize = useCallback(() => {
+    const el = inner.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    resize();
+    if (autoFocus) inner.current?.focus();
+  }, [value, autoFocus, resize]);
+
+  return (
+    <textarea
+      ref={inner}
+      className={className}
+      value={value}
+      rows={1}
+      onChange={(e) => { onChange(e); resize(); }}
+      onBlur={onBlur}
+      onKeyDown={onKeyDown}
+    />
+  );
+});
+
+// ─── Sort icon ─────────────────────────────────────────────────────────────────
+const SortIcon = ({ active, dir, onClick }) => (
+  <span
+    className={`rdt-sort-icon${active ? ' rdt-sort-active' : ''}`}
+    onClick={(e) => { e.stopPropagation(); onClick(); }}
+    title="Sort"
+  >
+    <Icon
+      icon={active ? (dir === 'asc' ? 'sort-asc' : 'sort-desc') : 'sort'}
+      iconSize={12}
+    />
+  </span>
+);
+
+// ─── DisplayTable ──────────────────────────────────────────────────────────────
 const DisplayTable = ({ blockUid, setIsEdit }) => {
   const [state, setState] = useState(() => getTableState(blockUid));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // After setState, useEffect fires on next render and focuses the target cell.
-  const [pendingFocus, setPendingFocus] = useState(null);
   const containerRef = useRef(null);
   const { headerNode, rows, styles, widths, view } = state;
 
-  // headerCells: [{uid, text}] following the chain structure.
+  // ── Sort ────────────────────────────────────────────────────────────────────
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState(null); // 'asc' | 'desc'
+
+  const sortedRows = useMemo(() => {
+    if (sortCol === null) return rows;
+    return [...rows].sort((a, b) => {
+      const aText = getRowCells(a)[sortCol]?.text ?? '';
+      const bText = getRowCells(b)[sortCol]?.text ?? '';
+      const aNum = parseFloat(aText);
+      const bNum = parseFloat(bText);
+      const cmp = (!isNaN(aNum) && !isNaN(bNum))
+        ? aNum - bNum
+        : aText.localeCompare(bText);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [rows, sortCol, sortDir]);
+
+  function cycleSort(colIndex) {
+    if (sortCol !== colIndex) { setSortCol(colIndex); setSortDir('asc'); }
+    else if (sortDir === 'asc') setSortDir('desc');
+    else { setSortCol(null); setSortDir(null); }
+  }
+
+  // ── Filter ──────────────────────────────────────────────────────────────────
+  const [filters, setFilters] = useState({});         // { [colIndex]: filterText }
+  const [openFilters, setOpenFilters] = useState(new Set()); // which columns are expanded
+
+  function toggleFilter(colIndex) {
+    setOpenFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(colIndex)) {
+        next.delete(colIndex);
+        // clear the filter value when closing
+        setFilters(f => { const n = { ...f }; delete n[colIndex]; return n; });
+      } else {
+        next.add(colIndex);
+      }
+      return next;
+    });
+  }
+
+  const showFilterRow = openFilters.size > 0;
+
+  const filteredRows = useMemo(() => {
+    const active = Object.entries(filters).filter(([, v]) => v);
+    if (!active.length) return sortedRows;
+    return sortedRows.filter(row => {
+      const cells = getRowCells(row);
+      return active.every(([i, text]) =>
+        (cells[parseInt(i)]?.text ?? '').toLowerCase().includes(text.toLowerCase())
+      );
+    });
+  }, [sortedRows, filters]);
+
+  const hasActiveFilter = Object.values(filters).some(Boolean);
+
+  // ── Custom cell editor ──────────────────────────────────────────────────────
+  // editingCell: { rowIndex: -1 for header, colIndex } | null
+  const [editingCell, setEditingCell] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const editInputRef = useRef(null);
+  const cancelEditRef = useRef(false);
+  // Optimistic text overrides: written immediately on commit, cleared when
+  // the pull watch refreshes state so there's no flash of the old value.
+  const [localOverrides, setLocalOverrides] = useState({});
+
+  function startEdit(rowIndex, colIndex, text) {
+    setEditingCell({ rowIndex, colIndex });
+    setEditingText(text ?? '');
+  }
+
+  function commitEdit(uid) {
+    cancelEditRef.current = true;
+    setLocalOverrides(prev => ({ ...prev, [uid]: editingText }));
+    updateBlock({ uid, text: editingText });
+    setEditingCell(null);
+    setEditingText('');
+  }
+
+  function discardEdit() {
+    cancelEditRef.current = true;
+    setEditingCell(null);
+    setEditingText('');
+  }
+
+  function handleCellBlur(uid) {
+    if (cancelEditRef.current) { cancelEditRef.current = false; return; }
+    setLocalOverrides(prev => ({ ...prev, [uid]: editingText }));
+    updateBlock({ uid, text: editingText });
+    setEditingCell(null);
+    setEditingText('');
+  }
+
+  function handleCellKeyDown(e, uid, rowIndex, colIndex) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      discardEdit();
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commitEdit(uid);
+      if (rowIndex >= 0) handleEnterKey(rowIndex, colIndex);
+      return;
+    }
+    // Shift+Enter inserts a newline — let textarea handle it naturally
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      commitEdit(uid);
+      handleTabKey(rowIndex, colIndex, e.shiftKey);
+    }
+  }
+
+  // Tab navigation
+  function handleTabKey(rowIndex, colIndex, reverse) {
+    const numCols = headerCells.length;
+    let nextRow = rowIndex, nextCol = colIndex + (reverse ? -1 : 1);
+    if (nextCol >= numCols) { nextCol = 0; nextRow = rowIndex < 0 ? 0 : rowIndex + 1; }
+    if (nextCol < 0) { nextCol = numCols - 1; nextRow = rowIndex <= 0 ? -1 : rowIndex - 1; }
+
+    if (nextRow < -1 || nextRow >= filteredRows.length) return;
+
+    if (nextRow === -1) {
+      // Header row
+      const cell = headerCells[nextCol];
+      if (cell) startEdit(-1, nextCol, cell.text);
+    } else {
+      const row = filteredRows[nextRow];
+      if (row) {
+        const cells = getRowCells(row);
+        startEdit(nextRow, nextCol, cells[nextCol]?.text ?? '');
+      }
+    }
+  }
+
+  // ── Enter key: add row and move down ────────────────────────────────────────
+  const enterStateRef = useRef({ rows: filteredRows, numCols: 0, blockUid });
   const headerCells = useMemo(
     () => headerNode ? getRowCells(headerNode) : [],
     [headerNode]
   );
   const numCols = headerCells.length;
 
-  // Watch for external changes to the block tree (e.g. user edits a cell
-  // directly in the outline) and re-render.
+  useEffect(() => {
+    enterStateRef.current = { rows: filteredRows, numCols, blockUid };
+  }, [filteredRows, numCols, blockUid]);
+
+  const [pendingEdit, setPendingEdit] = useState(null);
+
+  useEffect(() => {
+    if (!pendingEdit) return;
+    const { rowIndex, colIndex } = pendingEdit;
+    const row = filteredRows[rowIndex];
+    if (row) {
+      const cells = getRowCells(row);
+      startEdit(rowIndex, colIndex, cells[colIndex]?.text ?? '');
+    }
+    setPendingEdit(null);
+  }, [pendingEdit, filteredRows]);
+
+  function handleEnterKey(rowIndex, colIndex) {
+    const { rows: currentRows, numCols: currentNumCols, blockUid: uid } = enterStateRef.current;
+    const nextRowIndex = rowIndex + 1;
+    if (nextRowIndex >= currentRows.length) {
+      const fresh = getTableState(uid);
+      createBlock({
+        node: buildRowNode(currentNumCols),
+        order: fresh.rows.length + 1,
+        parentUid: uid,
+      }).then(() => {
+        setState(getTableState(uid));
+        setPendingEdit({ rowIndex: nextRowIndex, colIndex });
+      });
+    } else {
+      setPendingEdit({ rowIndex: nextRowIndex, colIndex });
+    }
+  }
+
+  // ── Pull watch ───────────────────────────────────────────────────────────────
   useEffect(() => {
     let debounceTimer;
     const query = `[:block/uid "${blockUid}"]`;
     const pattern = '[:block/uid :block/string {:block/children ...}]';
     const unwatch = window.roamAlphaAPI.data.addPullWatch(pattern, query, () => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => setState(getTableState(blockUid)), 200);
+      debounceTimer = setTimeout(() => {
+        setState(getTableState(blockUid));
+        setLocalOverrides({});
+      }, 200);
     });
     return () => {
       clearTimeout(debounceTimer);
@@ -280,71 +495,12 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
     };
   }, [blockUid]);
 
-  // Focus a body cell once the DOM has updated after a state change.
-  useEffect(() => {
-    if (!pendingFocus) return;
-    const { rowIndex, colIndex } = pendingFocus;
-    const tbody = containerRef.current?.querySelector('tbody');
-    if (tbody) {
-      const tr = tbody.querySelectorAll('tr')[rowIndex];
-      tr?.querySelectorAll('td')[colIndex]?.querySelector('.bp3-editable-text')?.click();
-    }
-    setPendingFocus(null);
-  }, [pendingFocus]);
-
+  // ── Column resize ────────────────────────────────────────────────────────────
   const [thRefs, setThRefs] = useState([]);
   useEffect(() => {
     setThRefs(headerCells.map(() => React.createRef()));
   }, [headerCells.length]);
   const trRef = useRef(null);
-
-  // Enter key via event delegation on the container div.
-  // Blueprint v3's EditableText doesn't forward onKeyDown to the textarea, so
-  // we intercept the event as it bubbles. React batches Blueprint's setState
-  // (confirm edit) with ours, so e.target is still in the DOM at this point.
-  const handleContainerKeyDown = useCallback((e) => {
-    if (e.key !== 'Enter' || e.shiftKey) return;
-
-    const td = e.target.closest?.('td');
-    const th = e.target.closest?.('th');
-
-    if (td) {
-      const tbody = containerRef.current?.querySelector('tbody');
-      const rowIndex = Array.from(tbody?.children ?? []).indexOf(td.parentElement);
-      const colIndex = Array.from(td.parentElement.children).indexOf(td);
-      if (rowIndex >= 0 && colIndex >= 0) handleEnterKey(rowIndex, colIndex);
-    } else if (th) {
-      const colIndex = Array.from(th.parentElement?.children ?? []).indexOf(th);
-      if (colIndex >= 0) handleEnterKey(-1, colIndex);
-    }
-  }, [/* handleEnterKey added below via ref trick to avoid stale closure */]);
-
-  // handleEnterKey needs rows.length and numCols which change, so we use a ref
-  // to avoid re-creating handleContainerKeyDown on every render.
-  const enterStateRef = useRef({ rows, numCols, blockUid });
-  useEffect(() => { enterStateRef.current = { rows, numCols, blockUid }; }, [rows, numCols, blockUid]);
-
-  function handleEnterKey(rowIndex, colIndex) {
-    const { rows, numCols, blockUid } = enterStateRef.current;
-    const nextRowIndex = rowIndex + 1;
-    const addRow = nextRowIndex >= rows.length;
-
-    const doFocus = () => setPendingFocus({ rowIndex: nextRowIndex, colIndex });
-
-    if (addRow) {
-      const fresh = getTableState(blockUid);
-      createBlock({
-        node: buildRowNode(numCols),
-        order: fresh.rows.length + 1,
-        parentUid: blockUid,
-      }).then(() => {
-        setState(getTableState(blockUid));
-        doFocus();
-      });
-    } else {
-      doFocus();
-    }
-  }
 
   const onDragStart = useCallback((e) => {
     e.dataTransfer.setDragImage(dragImage, 0, 0);
@@ -365,7 +521,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
     const th = thRefs[columnIndex]?.current;
     if (!th) return;
 
-    const newWidth = `${((cellWidth + delta) / rowWidth) * 100}%`;
+    const newWidth = `${cellWidth + delta}px`;
     th.style.width = newWidth;
 
     if (e.type !== 'dragend') return;
@@ -379,6 +535,37 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
     saveBlockSettings(blockUid, { ...existing, widths: newWidths });
   }, [blockUid, thRefs]);
 
+  // ── Rendering helpers ────────────────────────────────────────────────────────
+  const showAddresses = !!styles.showAddresses;
+
+  function renderCellContent(cell, rowIndex, colIndex) {
+    const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
+
+    if (isEditing) {
+      return (
+        <AutoTextarea
+          ref={editInputRef}
+          autoFocus
+          className="rdt-cell-input"
+          value={editingText}
+          onChange={(e) => setEditingText(e.target.value)}
+          onBlur={() => handleCellBlur(cell.uid)}
+          onKeyDown={(e) => handleCellKeyDown(e, cell.uid, rowIndex, colIndex)}
+        />
+      );
+    }
+
+    const displayText = localOverrides[cell.uid] ?? cell.text;
+    return (
+      <div className="rdt-cell-display">
+        {displayText
+          ? (RoamString ? <RoamString string={displayText} /> : displayText)
+          : <span className="rdt-cell-placeholder">&nbsp;</span>}
+      </div>
+    );
+  }
+
+  // ── Table menu ───────────────────────────────────────────────────────────────
   const TableMenu = () => (
     <Popover
       enforceFocus={false}
@@ -407,7 +594,6 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
               text="Column"
               onClick={async () => {
                 if (!headerNode) return;
-                // Append to the tail of each row's chain.
                 await createBlock({
                   node: { text: `Header ${numCols + 1}` },
                   order: 'last',
@@ -441,7 +627,6 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
               text="Last Column"
               onClick={async () => {
                 if (numCols <= 1) return;
-                // The last column is the first child of the node at depth numCols-2.
                 const depth = numCols - 2;
                 const preTailHeader = getChainNodeAtDepth(headerNode, depth);
                 if (preTailHeader?.children?.[0]) {
@@ -457,6 +642,16 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
               }}
             />
           </MenuItem>
+          {showFilterRow && (
+            <>
+              <MenuDivider />
+              <MenuItem
+                icon="filter-remove"
+                text="Clear Filters"
+                onClick={() => { setFilters({}); setOpenFilters(new Set()); }}
+              />
+            </>
+          )}
           <MenuDivider />
           <MenuItem icon="cog" text="Settings" onClick={() => setIsEdit(true)} />
           <MenuItem
@@ -475,78 +670,158 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
   );
 
   return (
-    <div style={{ position: 'relative' }} ref={containerRef} onKeyDown={handleContainerKeyDown}>
-      <span style={{ position: 'absolute', top: 4, right: 0 }}>
-        <TableMenu />
-      </span>
+    <div className="rdt-table-wrap" ref={containerRef}>
       <HTMLTable
-        className={`rdt-workbench-table dont-focus-block${view === 'plain' ? ' basic-text' : ''}`}
-        style={{ width: '100%', tableLayout: 'fixed', pointerEvents: 'auto' }}
+        className={`rdt-workbench-table dont-focus-block`}
+        style={{ tableLayout: 'auto', pointerEvents: 'auto' }}
         bordered={styles.bordered}
         condensed={styles.condensed}
         interactive={styles.interactive}
         striped={styles.striped}
       >
         <thead>
+          {/* Header row */}
           <tr ref={trRef}>
-            {headerCells.map((cell, i) => (
-              <th key={cell.uid} ref={thRefs[i]} style={{ width: widths[i], overflow: 'hidden' }}>
-                {view === 'embed' ? (
-                  <CellEmbed uid={cell.uid} />
-                ) : (
-                  <EditableText
-                    placeholder=""
-                    defaultValue={cell.text}
-                    onConfirm={(value) => updateBlock({ uid: cell.uid, text: value })}
-                  />
-                )}
-              </th>
-            ))}
+            {showAddresses && (
+              <th className="rdt-addr-col" style={{ width: 28 }}>#</th>
+            )}
+            {headerCells.map((cell, i) => {
+              const isEditing = editingCell?.rowIndex === -1 && editingCell?.colIndex === i;
+              return (
+                <th
+                  key={cell.uid}
+                  ref={thRefs[i]}
+                  style={{ width: widths[i], overflow: 'hidden', padding: 0 }}
+                >
+                  <div className="rdt-th-inner">
+                    {view === 'embed' ? (
+                      <CellEmbed uid={cell.uid} />
+                    ) : isEditing ? (
+                      <input
+                        ref={editInputRef}
+                        autoFocus
+                        className="rdt-cell-input rdt-header-input"
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        onBlur={() => handleCellBlur(cell.uid)}
+                        onKeyDown={(e) => handleCellKeyDown(e, cell.uid, -1, i)}
+                      />
+                    ) : (
+                      <div
+                        className="rdt-cell-display rdt-header-display"
+                        onClick={() => startEdit(-1, i, cell.text)}
+                      >
+                        {showAddresses && (
+                          <span className="rdt-col-badge">{colIndexToLetter(i)}</span>
+                        )}
+                        <span className="rdt-header-text">
+                          {(() => {
+                            const t = localOverrides[cell.uid] ?? cell.text;
+                            return t
+                              ? (RoamString ? <RoamString string={t} /> : t)
+                              : <span>&nbsp;</span>;
+                          })()}
+                        </span>
+                      </div>
+                    )}
+                    <SortIcon
+                      active={sortCol === i}
+                      dir={sortDir}
+                      onClick={() => cycleSort(i)}
+                    />
+                    <span
+                      className={`rdt-filter-icon${openFilters.has(i) ? ' rdt-filter-active' : ''}${filters[i] ? ' rdt-filter-has-value' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); toggleFilter(i); }}
+                      title={openFilters.has(i) ? 'Hide filter' : 'Filter this column'}
+                    >
+                      <Icon icon="filter" iconSize={12} />
+                    </span>
+                  </div>
+                </th>
+              );
+            })}
+            {/* Dedicated menu column header */}
+            <th className="rdt-menu-col">
+              <TableMenu />
+            </th>
           </tr>
+          {/* Filter row — only shown when at least one column has its filter open */}
+          {showFilterRow && (
+            <tr className="rdt-filter-row">
+              {showAddresses && <th className="rdt-addr-col" />}
+              {headerCells.map((_, i) => (
+                <th key={i} style={{ padding: '2px 4px' }}>
+                  {openFilters.has(i) ? (
+                    <input
+                      autoFocus={openFilters.size === 1}
+                      className="rdt-filter-input dont-focus-block"
+                      type="text"
+                      placeholder="Filter…"
+                      value={filters[i] ?? ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, [i]: e.target.value }))}
+                    />
+                  ) : null}
+                </th>
+              ))}
+              <th className="rdt-menu-col" />
+            </tr>
+          )}
         </thead>
         <tbody>
-          {rows.map((row, rowIndex) => {
-            // Col 0 = the row block itself; remaining cols follow the chain.
+          {filteredRows.map((row, rowIndex) => {
             const cells = getRowCells(row);
             return (
               <tr key={row.uid}>
-                {cells.map((cell, colIndex) => (
-                  <td key={cell.uid} style={{ overflow: 'hidden', position: 'relative' }}>
-                    {view === 'embed' ? (
-                      <CellEmbed uid={cell.uid} />
-                    ) : (
-                      <EditableText
-                        placeholder=""
-                        defaultValue={cell.text}
-                        onConfirm={(value) => updateBlock({ uid: cell.uid, text: value })}
-                        style={{ width: '100%' }}
-                      />
-                    )}
-                    {colIndex < cells.length - 1 && (
-                      <div
-                        style={{
-                          width: 11, cursor: 'ew-resize', position: 'absolute',
-                          top: 0, right: 0, bottom: 0, paddingLeft: 5, pointerEvents: 'auto',
-                        }}
-                        data-column={`column-${colIndex + 1}`}
-                        draggable
-                        onDragStart={onDragStart}
-                        onDrag={dragHandler}
-                        onDragEnd={dragHandler}
-                      />
-                    )}
-                  </td>
-                ))}
+                {showAddresses && (
+                  <td className="rdt-addr-col">{rowIndex + 1}</td>
+                )}
+                {cells.map((cell, colIndex) => {
+                  const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
+                  return (
+                    <td
+                      key={cell.uid}
+                      className={`rdt-cell${isEditing ? ' rdt-cell-editing' : ''}`}
+                      style={{ overflow: 'hidden', position: 'relative', padding: 0 }}
+                      onClick={() => {
+                        if (!isEditing && view !== 'embed') startEdit(rowIndex, colIndex, cell.text);
+                      }}
+                    >
+                      {view === 'embed' ? (
+                        <CellEmbed uid={cell.uid} />
+                      ) : (
+                        renderCellContent(cell, rowIndex, colIndex)
+                      )}
+                      {colIndex < cells.length - 1 && (
+                        <div
+                          style={{
+                            width: 11, cursor: 'ew-resize', position: 'absolute',
+                            top: 0, right: 0, bottom: 0, paddingLeft: 5, pointerEvents: 'auto',
+                          }}
+                          data-column={`column-${colIndex + 1}`}
+                          draggable
+                          onDragStart={onDragStart}
+                          onDrag={dragHandler}
+                          onDragEnd={dragHandler}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      )}
+                    </td>
+                  );
+                })}
+                <td className="rdt-menu-col" />
               </tr>
             );
           })}
         </tbody>
       </HTMLTable>
+      {hasActiveFilter && filteredRows.length === 0 && (
+        <div className="rdt-no-results">No rows match the current filter.</div>
+      )}
     </div>
   );
 };
 
-// ─── Table (wrapper) ──────────────────────────────────────────────────────────
+// ─── Table (wrapper) ───────────────────────────────────────────────────────────
 const Table = ({ blockUid }) => {
   const tree = useMemo(() => getBasicTreeByParentUid(blockUid), [blockUid]);
   const [isEdit, setIsEdit] = useState(!tree[0]?.uid);
