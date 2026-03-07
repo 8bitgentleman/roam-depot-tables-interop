@@ -230,6 +230,13 @@ export default {
       .rdt-table-wrap .rdt-menu-col .bp3-button { opacity: 0; transition: opacity 0.1s; }
       .rdt-table-wrap:hover .rdt-menu-col .bp3-button { opacity: 1; }
 
+      /* ── Formula range selection ── */
+      .rdt-formula-selecting {
+        background: rgba(19, 123, 189, 0.18) !important;
+        outline: 1px solid rgba(19, 123, 189, 0.5);
+        outline-offset: -1px;
+      }
+
       /* ── Formula cells ── */
       .rdt-formula-cell {
         position: relative;

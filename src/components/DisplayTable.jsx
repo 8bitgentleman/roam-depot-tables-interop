@@ -159,6 +159,59 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
   const cancelEditRef = useRef(false);
   const [localOverrides, setLocalOverrides] = useState({});
 
+  // ── Formula click-to-insert ──────────────────────────────────────────────────
+  const [formulaAnchor, setFormulaAnchor] = useState(null);
+  const [formulaDragCurrent, setFormulaDragCurrent] = useState(null);
+  const isFormulaEditing = editingCell !== null && editingText.startsWith('=');
+
+  function cellAddress(rowIndex, colIndex) {
+    return `${colIndexToLetter(colIndex)}${rowIndex + 1}`;
+  }
+
+  function insertAtCursor(text) {
+    const el = editInputRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? editingText.length;
+    const end = el.selectionEnd ?? editingText.length;
+    const newText = editingText.slice(0, start) + text + editingText.slice(end);
+    setEditingText(newText);
+    requestAnimationFrame(() => {
+      if (!editInputRef.current) return;
+      editInputRef.current.focus();
+      editInputRef.current.setSelectionRange(start + text.length, start + text.length);
+    });
+  }
+
+  function resolveFormulaMouseUp(toRow, toCol) {
+    if (!formulaAnchor) return;
+    const { rowIndex: aRow, colIndex: aCol } = formulaAnchor;
+    setFormulaAnchor(null);
+    setFormulaDragCurrent(null);
+    const minRow = Math.min(aRow, toRow), maxRow = Math.max(aRow, toRow);
+    const minCol = Math.min(aCol, toCol), maxCol = Math.max(aCol, toCol);
+    const addr = (minRow === maxRow && minCol === maxCol)
+      ? cellAddress(minRow, minCol)
+      : `${cellAddress(minRow, minCol)}:${cellAddress(maxRow, maxCol)}`;
+    insertAtCursor(addr);
+  }
+
+  function isInFormulaSelection(rowIndex, colIndex) {
+    if (!formulaAnchor || !formulaDragCurrent) return false;
+    const minRow = Math.min(formulaAnchor.rowIndex, formulaDragCurrent.rowIndex);
+    const maxRow = Math.max(formulaAnchor.rowIndex, formulaDragCurrent.rowIndex);
+    const minCol = Math.min(formulaAnchor.colIndex, formulaDragCurrent.colIndex);
+    const maxCol = Math.max(formulaAnchor.colIndex, formulaDragCurrent.colIndex);
+    return rowIndex >= minRow && rowIndex <= maxRow && colIndex >= minCol && colIndex <= maxCol;
+  }
+
+  // Clean up if drag ends outside the table
+  useEffect(() => {
+    if (!formulaAnchor) return;
+    const cancel = () => { setFormulaAnchor(null); setFormulaDragCurrent(null); };
+    document.addEventListener('mouseup', cancel);
+    return () => document.removeEventListener('mouseup', cancel);
+  }, [formulaAnchor]);
+
   const getCellValue = useCallback((rowIdx, colIdx, visited = new Set()) => {
     const row = filteredRows[rowIdx];
     if (!row) return '';
@@ -591,9 +644,23 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
                   return (
                     <td
                       key={cell.uid}
-                      className={`rdt-cell${isEditing ? ' rdt-cell-editing' : ''}`}
+                      className={`rdt-cell${isEditing ? ' rdt-cell-editing' : ''}${isInFormulaSelection(rowIndex, colIndex) ? ' rdt-formula-selecting' : ''}`}
                       style={{ overflow: 'hidden', position: 'relative', padding: 0 }}
+                      onMouseDown={(e) => {
+                        if (isFormulaEditing && !isEditing) {
+                          e.preventDefault();
+                          setFormulaAnchor({ rowIndex, colIndex });
+                          setFormulaDragCurrent({ rowIndex, colIndex });
+                        }
+                      }}
+                      onMouseEnter={() => {
+                        if (formulaAnchor) setFormulaDragCurrent({ rowIndex, colIndex });
+                      }}
+                      onMouseUp={() => {
+                        if (isFormulaEditing && formulaAnchor) resolveFormulaMouseUp(rowIndex, colIndex);
+                      }}
                       onClick={() => {
+                        if (isFormulaEditing) return;
                         if (!isEditing && view !== 'embed') startEdit(rowIndex, colIndex, cell.text);
                       }}
                     >
