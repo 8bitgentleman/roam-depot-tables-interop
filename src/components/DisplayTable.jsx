@@ -25,7 +25,7 @@ import {
   getTableState,
   colIndexToLetter,
 } from '../utils/blockHelpers';
-import { getBlockSettings, saveBlockSettings } from '../utils/settings';
+import { STYLE_CONFIG, VIEW_CONFIG, getBlockSettings, saveBlockSettings } from '../utils/settings';
 import { isFormula, evalFormula } from '../utils/formulas';
 
 // ─── CellEmbed ─────────────────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ const SortIcon = ({ active, dir, onClick }) => (
 );
 
 // ─── DisplayTable ──────────────────────────────────────────────────────────────
-const DisplayTable = ({ blockUid, setIsEdit }) => {
+const DisplayTable = ({ blockUid }) => {
   const [state, setState] = useState(() => getTableState(blockUid));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const containerRef = useRef(null);
@@ -431,6 +431,20 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
     );
   }
 
+  // ── Settings helpers ─────────────────────────────────────────────────────────
+  function toggleStyle(key) {
+    const newStyles = { ...styles, [key]: !styles[key] };
+    setState(prev => ({ ...prev, styles: newStyles }));
+    const existing = getBlockSettings(blockUid);
+    saveBlockSettings(blockUid, { ...existing, styles: newStyles });
+  }
+
+  function setViewMode(value) {
+    setState(prev => ({ ...prev, view: value }));
+    const existing = getBlockSettings(blockUid);
+    saveBlockSettings(blockUid, { ...existing, view: value });
+  }
+
   // ── Table menu ───────────────────────────────────────────────────────────────
   const TableMenu = () => (
     <Popover
@@ -519,7 +533,26 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
             </>
           )}
           <MenuDivider />
-          <MenuItem icon="cog" text="Settings" onClick={() => setIsEdit(true)} />
+          <MenuItem icon="cog" text="Settings">
+            <MenuDivider title="Style" />
+            {STYLE_CONFIG.map(({ key, label }) => (
+              <MenuItem
+                key={key}
+                icon={styles[key] ? 'tick' : 'blank'}
+                text={label}
+                onClick={() => toggleStyle(key)}
+              />
+            ))}
+            <MenuDivider title="View" />
+            {VIEW_CONFIG.map(({ value, label }) => (
+              <MenuItem
+                key={value}
+                icon={view === value ? 'tick' : 'blank'}
+                text={label}
+                onClick={() => setViewMode(value)}
+              />
+            ))}
+          </MenuItem>
           <MenuItem
             icon="edit"
             text="Edit Block"

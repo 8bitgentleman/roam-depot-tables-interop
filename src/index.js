@@ -5,6 +5,8 @@ import getUids from 'roamjs-components/dom/getUids';
 import addStyle from 'roamjs-components/dom/addStyle';
 import updateBlock from 'roamjs-components/writes/updateBlock';
 import Table from './table.jsx';
+import { setExtensionAPI } from './utils/extensionAPI';
+import { STYLE_CONFIG, VIEW_CONFIG } from './utils/settings';
 
 // Track all mounts for cleanup on unload.
 // Key: .rm-table element, Value: { root, container, nativeTable, hoverOnly }
@@ -47,6 +49,40 @@ let observer;
 
 export default {
   onload({ extensionAPI }) {
+    setExtensionAPI(extensionAPI);
+
+    extensionAPI.settings.panel.create({
+      tabTitle: 'Table Plus',
+      settings: [
+        {
+          id: 'default-rows',
+          name: 'Default Rows',
+          description: 'Number of rows when creating a new table',
+          action: { type: 'input', placeholder: '3' },
+        },
+        {
+          id: 'default-cols',
+          name: 'Default Columns',
+          description: 'Number of columns when creating a new table',
+          action: { type: 'input', placeholder: '3' },
+        },
+        ...STYLE_CONFIG.map(({ key, label, description }) => ({
+          id: `default-style-${key}`,
+          name: `Default: ${label}`,
+          description,
+          action: { type: 'switch' },
+        })),
+        {
+          id: 'default-view',
+          name: 'Default View',
+          description: 'Cell rendering mode for new tables',
+          action: {
+            type: 'select',
+            items: VIEW_CONFIG.map(({ value }) => value),
+          },
+        },
+      ],
+    });
 
     observer = createHTMLObserver({
       tag: 'DIV',

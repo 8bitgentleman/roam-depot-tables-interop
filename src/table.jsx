@@ -13,7 +13,7 @@ const Table = ({ blockUid }) => {
   return isEdit ? (
     <Configuration blockUid={blockUid} onSubmit={() => setIsEdit(false)} />
   ) : (
-    <DisplayTable blockUid={blockUid} setIsEdit={setIsEdit} />
+    <DisplayTable blockUid={blockUid} />
   );
 };
 
