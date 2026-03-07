@@ -3,10 +3,9 @@ import ReactDOM from 'react-dom';
 import createHTMLObserver from 'roamjs-components/dom/createHTMLObserver';
 import getUids from 'roamjs-components/dom/getUids';
 import addStyle from 'roamjs-components/dom/addStyle';
-import updateBlock from 'roamjs-components/writes/updateBlock';
 import Table from './table.jsx';
 import { setExtensionAPI } from './utils/extensionAPI';
-import { STYLE_CONFIG, VIEW_CONFIG } from './utils/settings';
+import { STYLE_CONFIG } from './utils/settings';
 
 // Track all mounts for cleanup on unload.
 // Key: .rm-table element, Value: { root, container, nativeTable, hoverOnly }
@@ -72,15 +71,6 @@ export default {
           description,
           action: { type: 'switch' },
         })),
-        {
-          id: 'default-view',
-          name: 'Default View',
-          description: 'Cell rendering mode for new tables',
-          action: {
-            type: 'select',
-            items: VIEW_CONFIG.map(({ value }) => value),
-          },
-        },
       ],
     });
 
@@ -105,8 +95,11 @@ export default {
       .rdt-table-config input[type=number] {
         -moz-appearance: textfield;
       }
-      .rdt-workbench-table .rm-block-separator {
+      .rdt-table .rm-block-separator {
         display: none;
+      }
+      .rdt-table{
+        border: 1px solid var(--rm-border-color, #d4d4d4);
       }
 
       /* ── Cell editor ── */

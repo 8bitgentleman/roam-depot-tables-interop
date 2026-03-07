@@ -1,15 +1,9 @@
 // ─── Settings config ───────────────────────────────────────────────────────────
 export const STYLE_CONFIG = [
-  { key: 'striped',       label: 'Striped',         description: 'Alternate row background colors' },
-  { key: 'bordered',      label: 'Bordered',         description: 'Draw borders around each cell' },
-  { key: 'condensed',     label: 'Compact',          description: 'Reduce cell padding' },
-  { key: 'interactive',   label: 'Interactive',      description: 'Highlight rows on hover' },
-  { key: 'showAddresses', label: 'Cell Addresses',   description: 'Show A1 row/column address labels' },
-];
-
-export const VIEW_CONFIG = [
-  { value: 'plain', label: 'Basic Text', description: 'Edit cells as inline plain text' },
-  { value: 'embed', label: 'Embed',      description: 'Render full Roam blocks — supports markdown, block refs, queries' },
+  { key: 'striped',       label: 'Striped',        description: 'Alternate row background colors' },
+  { key: 'bordered',      label: 'Bordered',       description: 'Draw borders around each cell' },
+  { key: 'interactive',   label: 'Interactive',    description: 'Highlight rows on hover' },
+  { key: 'showAddresses', label: 'Cell Addresses', description: 'Show A1 row/column address labels' },
 ];
 
 // ─── Settings storage ─────────────────────────────────────────────────────────
@@ -20,7 +14,6 @@ export function defaultSettings() {
   return {
     styles: Object.fromEntries(STYLE_CONFIG.map(({ key }) => [key, key === 'striped'])),
     widths: {},
-    view: 'plain',
   };
 }
 

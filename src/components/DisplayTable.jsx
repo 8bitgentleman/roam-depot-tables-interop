@@ -25,18 +25,8 @@ import {
   getTableState,
   colIndexToLetter,
 } from '../utils/blockHelpers';
-import { STYLE_CONFIG, VIEW_CONFIG, getBlockSettings, saveBlockSettings } from '../utils/settings';
+import { STYLE_CONFIG, getBlockSettings, saveBlockSettings } from '../utils/settings';
 import { isFormula, evalFormula } from '../utils/formulas';
-
-// ─── CellEmbed ─────────────────────────────────────────────────────────────────
-const CellEmbed = ({ uid }) => {
-  const contentRef = useRef(null);
-  useEffect(() => {
-    const el = contentRef.current;
-    if (el) window.roamAlphaAPI.ui.components.renderBlock({ uid, el });
-  }, [uid]);
-  return <div className="rdt-table-embed" ref={contentRef} />;
-};
 
 const dragImage = document.createElement('img');
 dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
@@ -94,7 +84,7 @@ const DisplayTable = ({ blockUid }) => {
   const [state, setState] = useState(() => getTableState(blockUid));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const containerRef = useRef(null);
-  const { headerNode, rows, styles, widths, view } = state;
+  const { headerNode, rows, styles, widths } = state;
 
   // ── Sort ────────────────────────────────────────────────────────────────────
   const [sortCol, setSortCol] = useState(null);
@@ -362,8 +352,6 @@ const DisplayTable = ({ blockUid }) => {
   useEffect(() => {
     setThRefs(headerCells.map(() => React.createRef()));
   }, [headerCells.length]);
-  const trRef = useRef(null);
-
   const onDragStart = useCallback((e) => {
     e.dataTransfer.setDragImage(dragImage, 0, 0);
   }, []);
@@ -437,12 +425,6 @@ const DisplayTable = ({ blockUid }) => {
     setState(prev => ({ ...prev, styles: newStyles }));
     const existing = getBlockSettings(blockUid);
     saveBlockSettings(blockUid, { ...existing, styles: newStyles });
-  }
-
-  function setViewMode(value) {
-    setState(prev => ({ ...prev, view: value }));
-    const existing = getBlockSettings(blockUid);
-    saveBlockSettings(blockUid, { ...existing, view: value });
   }
 
   // ── Table menu ───────────────────────────────────────────────────────────────
@@ -534,22 +516,12 @@ const DisplayTable = ({ blockUid }) => {
           )}
           <MenuDivider />
           <MenuItem icon="cog" text="Settings">
-            <MenuDivider title="Style" />
             {STYLE_CONFIG.map(({ key, label }) => (
               <MenuItem
                 key={key}
                 icon={styles[key] ? 'tick' : 'blank'}
                 text={label}
                 onClick={() => toggleStyle(key)}
-              />
-            ))}
-            <MenuDivider title="View" />
-            {VIEW_CONFIG.map(({ value, label }) => (
-              <MenuItem
-                key={value}
-                icon={view === value ? 'tick' : 'blank'}
-                text={label}
-                onClick={() => setViewMode(value)}
               />
             ))}
           </MenuItem>
@@ -571,15 +543,14 @@ const DisplayTable = ({ blockUid }) => {
   return (
     <div className="rdt-table-wrap" ref={containerRef}>
       <HTMLTable
-        className={`rdt-workbench-table dont-focus-block`}
+        className={`rdt-table dont-focus-block`}
         style={{ tableLayout: 'auto', pointerEvents: 'auto' }}
         bordered={styles.bordered}
-        condensed={styles.condensed}
         interactive={styles.interactive}
         striped={styles.striped}
       >
         <thead>
-          <tr ref={trRef}>
+          <tr>
             {showAddresses && (
               <th className="rdt-addr-col" style={{ width: 28 }}>#</th>
             )}
@@ -592,9 +563,7 @@ const DisplayTable = ({ blockUid }) => {
                   style={{ width: widths[i], overflow: 'hidden', padding: 0 }}
                 >
                   <div className="rdt-th-inner">
-                    {view === 'embed' ? (
-                      <CellEmbed uid={cell.uid} />
-                    ) : isEditing ? (
+                    {isEditing ? (
                       <input
                         ref={editInputRef}
                         autoFocus
@@ -694,14 +663,10 @@ const DisplayTable = ({ blockUid }) => {
                       }}
                       onClick={() => {
                         if (isFormulaEditing) return;
-                        if (!isEditing && view !== 'embed') startEdit(rowIndex, colIndex, cell.text);
+                        if (!isEditing) startEdit(rowIndex, colIndex, cell.text);
                       }}
                     >
-                      {view === 'embed' ? (
-                        <CellEmbed uid={cell.uid} />
-                      ) : (
-                        renderCellContent(cell, rowIndex, colIndex)
-                      )}
+                      {renderCellContent(cell, rowIndex, colIndex)}
                       {colIndex < cells.length - 1 && (
                         <div
                           style={{

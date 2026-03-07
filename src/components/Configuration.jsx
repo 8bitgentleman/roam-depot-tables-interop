@@ -17,7 +17,6 @@ function getDefaults() {
         api?.settings.get(`default-style-${key}`) ?? base.styles[key],
       ])
     ),
-    view: api?.settings.get('default-view') || base.view,
   };
 }
 
@@ -47,7 +46,6 @@ const Configuration = ({ blockUid, onSubmit }) => {
     saveBlockSettings(blockUid, {
       styles: defaults.styles,
       widths: {},
-      view: defaults.view,
     });
     onSubmit();
     setLoading(false);
