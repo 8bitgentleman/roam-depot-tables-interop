@@ -41,7 +41,7 @@ const dragImage = document.createElement('img');
 dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
 // ─── Roam string renderer ─────────────────────────────────────────────────────
-const { String: RoamString } = window.roamAlphaAPI.ui.react;
+const getRoamString = () => window.roamAlphaAPI?.ui?.react?.BlockString;
 
 // ─── Auto-resizing textarea ────────────────────────────────────────────────────
 const AutoTextarea = React.forwardRef(({ value, onChange, onBlur, onKeyDown, className, autoFocus }, ref) => {
@@ -347,6 +347,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
     }
 
     const displayText = localOverrides[cell.uid] ?? cell.text;
+    const RoamString = getRoamString();
     return (
       <div className="rdt-cell-display">
         {displayText
@@ -507,6 +508,7 @@ const DisplayTable = ({ blockUid, setIsEdit }) => {
                         <span className="rdt-header-text">
                           {(() => {
                             const t = localOverrides[cell.uid] ?? cell.text;
+                            const RoamString = getRoamString();
                             return t
                               ? (RoamString ? <RoamString string={t} /> : t)
                               : <span>&nbsp;</span>;
