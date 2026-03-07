@@ -1,4 +1,4 @@
-# Table+
+# Table Plus
 
 An enhanced table editor for Roam Research that replaces the native table renderer with a richer interface. Because it works directly with native `{{table}}` blocks, your data is always in standard Roam format — disable the extension and your tables are still fully readable with Roam's built-in renderer.
 
