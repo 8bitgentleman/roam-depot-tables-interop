@@ -2,7 +2,7 @@
 
 An enhanced table editor for Roam Research that replaces the native table renderer with a richer interface. Because it works directly with native `{{table}}` blocks, your data is always in standard Roam format — disable the extension and your tables are still fully readable with Roam's built-in renderer.
 
-Display preferences (styles, column widths, view mode) are stored in the block's properties, not as child blocks, so they never appear as extra rows in the native rendering.
+Display preferences (styles, column widths) are stored in the block's properties, not as child blocks, so they never appear as extra rows in the native rendering.
 
 ## How it works
 
@@ -66,16 +66,13 @@ Click the `···` menu in the top-right corner of the table to access:
 
 Drag the resize handle at the right edge of any cell to adjust column width. Widths are saved automatically in block settings.
 
-**Address labels**
-
-Enable "Show Addresses" in Settings to display row numbers in the leftmost column and A/B/C column badges in headers. Useful when writing formulas.
-
 **Changing display settings**
 
-Open the table menu and select "Settings" to return to the configuration panel. Options include:
-- **Styles:** bordered, condensed, striped, interactive
-- **View mode:** Basic Text (inline editor) or Embed (renders each cell as a full Roam block)
-- **Show Addresses:** toggle row/column address labels
+Open the table menu and select "Settings" to toggle display options:
+- **Striped** — alternate row background colors
+- **Bordered** — draw borders around each cell
+- **Interactive** — highlight rows on hover
+- **Cell Addresses** — show row numbers and A/B/C column badges (useful when writing formulas)
 
 **Editing the source block**
 

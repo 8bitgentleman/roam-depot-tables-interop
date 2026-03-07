@@ -10,6 +10,7 @@ import { STYLE_CONFIG } from './utils/settings';
 // Track all mounts for cleanup on unload.
 // Key: .rm-table element, Value: { root, container, nativeTable, hoverOnly }
 const mounts = new Map();
+let styleEl;
 
 function mount(el) {
   if (mounts.has(el)) return;
@@ -81,7 +82,7 @@ export default {
       removeCallback: unmount,
     });
 
-    addStyle(`
+    styleEl = addStyle(`
       .rdt-table-config .rdt-input-label label {
         min-width: 70px;
       }
@@ -301,6 +302,7 @@ export default {
 
   onunload() {
     observer?.disconnect();
+    styleEl?.remove();
     for (const el of mounts.keys()) {
       unmount(el);
     }

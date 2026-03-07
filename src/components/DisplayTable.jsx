@@ -230,12 +230,14 @@ const DisplayTable = ({ blockUid }) => {
     updateBlock({ uid, text: editingText });
     setEditingCell(null);
     setEditingText('');
+    setTimeout(() => { cancelEditRef.current = false; }, 0);
   }
 
   function discardEdit() {
     cancelEditRef.current = true;
     setEditingCell(null);
     setEditingText('');
+    setTimeout(() => { cancelEditRef.current = false; }, 0);
   }
 
   function handleCellBlur(uid) {
@@ -287,16 +289,16 @@ const DisplayTable = ({ blockUid }) => {
   }
 
   // ── Enter key: add row and move down ────────────────────────────────────────
-  const enterStateRef = useRef({ rows: filteredRows, numCols: 0, blockUid });
   const headerCells = useMemo(
     () => headerNode ? getRowCells(headerNode) : [],
     [headerNode]
   );
   const numCols = headerCells.length;
 
+  const enterStateRef = useRef({ rows, numCols, blockUid });
   useEffect(() => {
-    enterStateRef.current = { rows: filteredRows, numCols, blockUid };
-  }, [filteredRows, numCols, blockUid]);
+    enterStateRef.current = { rows, numCols, blockUid };
+  }, [rows, numCols, blockUid]);
 
   const [pendingEdit, setPendingEdit] = useState(null);
 
@@ -311,16 +313,22 @@ const DisplayTable = ({ blockUid }) => {
     setPendingEdit(null);
   }, [pendingEdit, filteredRows]);
 
+  const isCreatingRowRef = useRef(false);
+
   function handleEnterKey(rowIndex, colIndex) {
+    if (isCreatingRowRef.current) return;
     const { rows: currentRows, numCols: currentNumCols, blockUid: uid } = enterStateRef.current;
     const nextRowIndex = rowIndex + 1;
     if (nextRowIndex >= currentRows.length) {
+      if (hasActiveFilter) return;
+      isCreatingRowRef.current = true;
       const fresh = getTableState(uid);
       createBlock({
         node: buildRowNode(currentNumCols),
         order: fresh.rows.length + 1,
         parentUid: uid,
       }).then(() => {
+        isCreatingRowRef.current = false;
         setState(getTableState(uid));
         setPendingEdit({ rowIndex: nextRowIndex, colIndex });
       });
@@ -428,7 +436,7 @@ const DisplayTable = ({ blockUid }) => {
   }
 
   // ── Table menu ───────────────────────────────────────────────────────────────
-  const TableMenu = () => (
+  const tableMenu = (
     <Popover
       enforceFocus={false}
       autoFocus={false}
@@ -609,7 +617,7 @@ const DisplayTable = ({ blockUid }) => {
               );
             })}
             <th className="rdt-menu-col">
-              <TableMenu />
+              {tableMenu}
             </th>
           </tr>
           {showFilterRow && (

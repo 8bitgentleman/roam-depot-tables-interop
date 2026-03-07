@@ -67,7 +67,7 @@ export function evalFormula(text, getCellValue, visited = new Set()) {
 
   switch (fn) {
     case 'SUM':   return String(nums.reduce((a, b) => a + b, 0));
-    case 'AVG':   return nums.length ? String(nums.reduce((a, b) => a + b, 0) / nums.length) : '#DIV/0';
+    case 'AVG':   return nums.length ? String(nums.reduce((a, b) => a + b, 0) / nums.length) : '#DIV/0!';
     case 'COUNT': return String(nums.length);
     case 'MIN':   return nums.length ? String(Math.min(...nums)) : '';
     case 'MAX':   return nums.length ? String(Math.max(...nums)) : '';
