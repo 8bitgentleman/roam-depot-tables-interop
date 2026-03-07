@@ -47,17 +47,6 @@ let observer;
 
 export default {
   onload({ extensionAPI }) {
-    extensionAPI.ui.commandPalette.addCommand({
-      label: 'Create Table',
-      callback: async () => {
-        const uid = window.roamAlphaAPI.ui.getFocusedBlock()?.['block-uid'];
-        if (!uid) return;
-        document.querySelector('body')?.click();
-        setTimeout(async () => {
-          await updateBlock({ uid, text: '{{[[table]]}}' });
-        }, 200);
-      },
-    });
 
     observer = createHTMLObserver({
       tag: 'DIV',

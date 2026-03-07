@@ -1,7 +1,7 @@
 {
-  "name": "roam-depot-example",
+  "name": "roam-depot-table-plus",
   "version": "1.0.0",
-  "description": "Roam Research Plugin Example",
+  "description": "Extend tables",
   "main": "index.js",
   "scripts": {
     "build": "webpack",
