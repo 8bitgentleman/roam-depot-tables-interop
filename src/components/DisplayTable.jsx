@@ -533,16 +533,6 @@ const DisplayTable = ({ blockUid }) => {
               />
             ))}
           </MenuItem>
-          <MenuItem
-            icon="edit"
-            text="Edit Block"
-            onClick={() => {
-              const location = getUids(containerRef.current?.closest('.roam-block'));
-              window.roamAlphaAPI.ui.setBlockFocusAndSelection({
-                location: { 'window-id': location.windowId, 'block-uid': location.blockUid },
-              });
-            }}
-          />
         </Menu>
       }
     />
