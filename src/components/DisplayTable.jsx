@@ -31,11 +31,35 @@ import { isFormula, evalFormula } from '../utils/formulas';
 const dragImage = document.createElement('img');
 dragImage.src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
-// ─── Roam string renderer ─────────────────────────────────────────────────────
+// ─── Roam string renderer (used for formula results only) ─────────────────────
 const getRoamString = () => window.roamAlphaAPI?.ui?.react?.BlockString;
 
+// ─── Roam block renderer (editable, supports embeds) ─────────────────────────
+const RoamBlock = ({ uid }) => {
+  const elRef = useRef(null);
+
+  useEffect(() => {
+    const el = elRef.current;
+    if (!el || !uid || !window.roamAlphaAPI?.ui?.components?.renderBlock) return;
+
+    window.roamAlphaAPI.ui.components.renderBlock({
+      uid,
+      el,
+      'open?': false,
+    });
+
+    return () => {
+      if (el) el.innerHTML = '';
+    };
+  }, [uid]);
+
+  // Stop propagation so Roam's native block editor handles clicks inside
+  // (especially block embeds), without also triggering our startEdit handler
+  return <div ref={elRef} onClick={(e) => e.stopPropagation()} />;
+};
+
 // ─── Auto-resizing textarea ────────────────────────────────────────────────────
-const AutoTextarea = React.forwardRef(({ value, onChange, onBlur, onKeyDown, className, autoFocus }, ref) => {
+const AutoTextarea = React.forwardRef(({ value, onChange, onBlur, onKeyDown, className, autoFocus, minWidth }, ref) => {
   const inner = useRef(null);
 
   React.useImperativeHandle(ref, () => inner.current);
@@ -56,6 +80,7 @@ const AutoTextarea = React.forwardRef(({ value, onChange, onBlur, onKeyDown, cla
     <textarea
       ref={inner}
       className={className}
+      style={minWidth ? { minWidth } : undefined}
       value={value}
       rows={1}
       onChange={(e) => { onChange(e); resize(); }}
@@ -145,6 +170,7 @@ const DisplayTable = ({ blockUid }) => {
   // ── Custom cell editor ──────────────────────────────────────────────────────
   const [editingCell, setEditingCell] = useState(null);
   const [editingText, setEditingText] = useState('');
+  const [editingCellWidth, setEditingCellWidth] = useState(null);
   const editInputRef = useRef(null);
   const cancelEditRef = useRef(false);
   const [localOverrides, setLocalOverrides] = useState({});
@@ -222,6 +248,11 @@ const DisplayTable = ({ blockUid }) => {
   function startEdit(rowIndex, colIndex, text) {
     setEditingCell({ rowIndex, colIndex });
     setEditingText(text ?? '');
+    // Snapshot the column's rendered width so the td doesn't collapse when the
+    // RoamBlock display is swapped out for the textarea (especially the last
+    // column which has no stored explicit width).
+    const w = thRefs[colIndex]?.current?.getBoundingClientRect().width;
+    setEditingCellWidth(w || null);
   }
 
   function commitEdit(uid) {
@@ -230,6 +261,7 @@ const DisplayTable = ({ blockUid }) => {
     updateBlock({ uid, text: editingText });
     setEditingCell(null);
     setEditingText('');
+    setEditingCellWidth(null);
     setTimeout(() => { cancelEditRef.current = false; }, 0);
   }
 
@@ -237,6 +269,7 @@ const DisplayTable = ({ blockUid }) => {
     cancelEditRef.current = true;
     setEditingCell(null);
     setEditingText('');
+    setEditingCellWidth(null);
     setTimeout(() => { cancelEditRef.current = false; }, 0);
   }
 
@@ -246,6 +279,7 @@ const DisplayTable = ({ blockUid }) => {
     updateBlock({ uid, text: editingText });
     setEditingCell(null);
     setEditingText('');
+    setEditingCellWidth(null);
   }
 
   function handleCellKeyDown(e, uid, rowIndex, colIndex) {
@@ -405,6 +439,7 @@ const DisplayTable = ({ blockUid }) => {
           ref={editInputRef}
           autoFocus
           className="rdt-cell-input"
+          minWidth={editingCellWidth}
           value={editingText}
           onChange={(e) => setEditingText(e.target.value)}
           onBlur={() => handleCellBlur(cell.uid)}
@@ -415,13 +450,18 @@ const DisplayTable = ({ blockUid }) => {
 
     const rawText = localOverrides[cell.uid] ?? cell.text;
     const formula = isFormula(rawText);
-    const displayText = formula ? evalFormula(rawText, getCellValue) : rawText;
     const RoamString = getRoamString();
     return (
       <div className={`rdt-cell-display${formula ? ' rdt-formula-cell' : ''}`}>
-        {displayText
-          ? (RoamString ? <RoamString string={displayText} /> : displayText)
-          : <span className="rdt-cell-placeholder">&nbsp;</span>}
+        {formula
+          ? (() => {
+              const displayText = evalFormula(rawText, getCellValue);
+              return displayText
+                ? (RoamString ? <RoamString string={displayText} /> : displayText)
+                : <span className="rdt-cell-placeholder">&nbsp;</span>;
+            })()
+          : <RoamBlock uid={cell.uid} />
+        }
         {formula && <span className="rdt-formula-badge" title={rawText}>fx</span>}
       </div>
     );
