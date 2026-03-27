@@ -84,7 +84,7 @@ export default {
 
     styleEl = addStyle(`
       .rdt-table-config .rdt-input-label label {
-        min-width: 70px;
+        min-width: 20px;
       }
       /* Chrome, Safari, Edge, Opera */
       .rdt-table-config input::-webkit-outer-spin-button,
@@ -296,6 +296,164 @@ export default {
         padding: 12px;
         color: var(--rm-text-color-muted, #888);
         font-size: 13px;
+      }
+
+      /* ── Drag handle column ── */
+      .rdt-drag-col {
+        width: 22px !important;
+        min-width: 22px;
+        max-width: 22px;
+        padding: 0 !important;
+        border-right: none !important;
+      }
+      .rdt-drag-handle-col {
+        width: 22px;
+        padding: 0 !important;
+        text-align: center;
+        border-right: none !important;
+      }
+      .rdt-drag-handle {
+        display: inline-block;
+        opacity: 0;
+        color: var(--rm-text-color-muted, #aaa);
+        font-size: 14px;
+        line-height: 1;
+        cursor: grab;
+        padding: 6px 4px;
+        user-select: none;
+        transition: opacity 0.1s;
+      }
+      tr:hover .rdt-drag-handle { opacity: 0.45; }
+      .rdt-drag-handle:hover { opacity: 0.85 !important; }
+      .rdt-drag-handle:active { cursor: grabbing; }
+      .rdt-row-dragging { opacity: 0.35; }
+      .rdt-row-drop-target > td { box-shadow: inset 0 2px 0 var(--rm-link-color, #137cbd); }
+
+      /* ── Status pill ── */
+      .rdt-status-pill {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 18px;
+        white-space: nowrap;
+        background: rgba(0,0,0,0.07);
+      }
+      .rdt-status-done {
+        text-decoration: line-through;
+        opacity: 0.65;
+      }
+      .rdt-cell-typed { cursor: pointer; }
+      .rdt-cell-typed .rdt-cell-placeholder {
+        color: var(--rm-text-color-muted, #bbb);
+        font-size: 11px;
+      }
+
+      /* ── Column type badge in header ── */
+      .rdt-col-type-badge {
+        font-size: 11px;
+        opacity: 0.45;
+        flex-shrink: 0;
+        user-select: none;
+      }
+
+      /* ── Column config editor popover ── */
+      .rdt-col-config {
+        padding: 12px 14px;
+        min-width: 230px;
+        max-width: 310px;
+      }
+      .rdt-col-config-header {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--rm-text-color-muted, #888);
+        margin-bottom: 10px;
+      }
+      .rdt-col-config-list {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 8px;
+        max-height: 260px;
+        overflow-y: auto;
+      }
+      .rdt-col-config-row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .rdt-col-config-input {
+        flex: 1;
+        min-width: 0;
+        border: 1px solid var(--rm-border-color, #d4d4d4);
+        border-radius: 3px;
+        padding: 3px 7px;
+        font-size: 13px;
+        background: var(--rm-bg, white);
+        color: inherit;
+        box-sizing: border-box;
+        outline: none;
+      }
+      .rdt-col-config-input:focus { border-color: var(--rm-link-color, #137cbd); }
+      .rdt-col-config-hidden-label {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 11px;
+        color: var(--rm-text-color-muted, #888);
+        white-space: nowrap;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .rdt-col-config-delete {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--rm-text-color-muted, #aaa);
+        font-size: 17px;
+        padding: 0 3px;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .rdt-col-config-delete:hover { color: var(--rm-intent-danger-color, #c23030); }
+      .rdt-col-config-add {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding-top: 4px;
+        border-top: 1px solid var(--rm-border-color, #eee);
+        margin-bottom: 10px;
+      }
+      .rdt-col-config-footer {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        justify-content: flex-end;
+      }
+
+      /* ── Hidden rows disclosure ── */
+      .rdt-hidden-disclosure {
+        cursor: pointer;
+        user-select: none;
+      }
+      .rdt-hidden-disclosure-cell {
+        padding: 5px 11px !important;
+        font-size: 12px;
+        color: var(--rm-text-color-muted, #999);
+        border-top: 1px dashed var(--rm-border-color, #ddd) !important;
+      }
+      .rdt-hidden-disclosure:hover .rdt-hidden-disclosure-cell {
+        color: var(--rm-text-color, #444);
+        background: var(--rm-bg-secondary, #f7f7f7);
+      }
+      .rdt-hidden-disclosure-icon {
+        margin-right: 5px;
+        font-size: 10px;
+        display: inline-block;
+        width: 10px;
       }
     `);
   },

@@ -14,6 +14,7 @@ export function defaultSettings() {
   return {
     styles: Object.fromEntries(STYLE_CONFIG.map(({ key }) => [key, key === 'striped'])),
     widths: {},
+    columns: {},
   };
 }
 
